@@ -40,7 +40,7 @@ std::vector<float> MakeSampleImage(const std::vector<Vec2>& points, size_t image
     return ret;
 }
 
-std::vector<uint8_t> ImageFloatToRGBAU8(const std::vector<float>& image, size_t imageResolution)
+std::vector<uint8_t> ImageFloatToU8(const std::vector<float>& image, size_t imageResolution)
 {
     std::vector<uint8_t> ret(imageResolution*imageResolution);
     for (size_t index = 0, count = image.size(); index < count; ++index)
@@ -60,8 +60,8 @@ int main(int argc, char** argv)
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
         DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount);
-        std::vector<uint8_t> imageU8 = ImageFloatToRGBAU8(image, c_imageSize);
-        std::vector<uint8_t> imageDFTU8 = ImageFloatToRGBAU8(imageDFT, c_imageSize);
+        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
+        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
         stbi_write_png("out/BN_ProgProj.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
         stbi_write_png("out/BN_ProgProj_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
@@ -74,8 +74,8 @@ int main(int argc, char** argv)
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
         DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount);
-        std::vector<uint8_t> imageU8 = ImageFloatToRGBAU8(image, c_imageSize);
-        std::vector<uint8_t> imageDFTU8 = ImageFloatToRGBAU8(imageDFT, c_imageSize);
+        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
+        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
         stbi_write_png("out/BN_Mitchels.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
         stbi_write_png("out/BN_Mitchels_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
@@ -91,7 +91,7 @@ TODO:
 
 * do radial periodogram also. Maybe min, max and average?
 
-* try mag squared again?
+* try mag squared again? Maybe the problem is sRGB lol.
 
 
 * compare vs the "extra penalty"
