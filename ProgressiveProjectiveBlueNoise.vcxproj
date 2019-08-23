@@ -117,6 +117,19 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BN_Mitchels.h" />
+    <ClInclude Include="BN_progproj.h" />
+    <ClInclude Include="dft.h" />
+    <ClInclude Include="simple_fft\check_fft.hpp" />
+    <ClInclude Include="simple_fft\copy_array.hpp" />
+    <ClInclude Include="simple_fft\error_handling.hpp" />
+    <ClInclude Include="simple_fft\fft.h" />
+    <ClInclude Include="simple_fft\fft.hpp" />
+    <ClInclude Include="simple_fft\fft_impl.hpp" />
+    <ClInclude Include="simple_fft\fft_settings.h" />
+    <ClInclude Include="stb\stb_image_write.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

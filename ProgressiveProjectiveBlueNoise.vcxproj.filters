@@ -3,4 +3,41 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BN_Mitchels.h" />
+    <ClInclude Include="stb\stb_image_write.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\check_fft.hpp">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\copy_array.hpp">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\error_handling.hpp">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\fft.h">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\fft.hpp">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\fft_impl.hpp">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_fft\fft_settings.h">
+      <Filter>simple_fft</Filter>
+    </ClInclude>
+    <ClInclude Include="BN_progproj.h" />
+    <ClInclude Include="dft.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="stb">
+      <UniqueIdentifier>{590b6ce2-6ac7-406a-971c-8d5fc87bce79}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="simple_fft">
+      <UniqueIdentifier>{8861df87-aaf2-485d-a92d-403192f167b5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
 </Project>
