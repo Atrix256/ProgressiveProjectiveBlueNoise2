@@ -31,13 +31,12 @@ struct ComplexImage2D
     }
 };
 
-template <typename T>
-void DFT(const std::vector<T>& imageSrc, std::vector<T>& imageDest, size_t width)
+void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size_t width)
 {
-    // convert the source image to float and store it in a complex image so it can be DFTd
+    // convert the source image to complex so it can be DFTd
     ComplexImage2D complexImageIn(width, width);
     for (size_t index = 0, count = width * width; index < count; ++index)
-        complexImageIn.pixels[index] = float(imageSrc[index]) / float(std::numeric_limits<T>::max());
+        complexImageIn.pixels[index] = imageSrc[index];
 
     // DFT the image to get frequency of the samples
     const char* error = nullptr;
@@ -69,22 +68,19 @@ void DFT(const std::vector<T>& imageSrc, std::vector<T>& imageDest, size_t width
         }
     }
 
-    // normalize the magnitudes and convert it back to a type T image
+    // normalize the magnitudes
     //const float c = 1.0f / log(1.0f / 255.0f + maxMag);
     {
         imageDest.resize(width * width);
         const float* src = magnitudes.data();
-        T* dest = imageDest.data();
+        float* dest = imageDest.data();
         for (size_t y = 0; y < width; ++y)
         {
             for (size_t x = 0; x < width; ++x)
             {
                 //float normalized = c * log(1.0f / 255.0f + *src);
                 float normalized = *src / maxMag;
-
-                float value = Lerp(0, float(std::numeric_limits<T>::max() + 1), normalized);
-                value = Clamp(0.0f, float(std::numeric_limits<T>::max()), value);
-                *dest = T(value);
+                *dest = *src / maxMag;
 
                 ++src;
                 ++dest;
