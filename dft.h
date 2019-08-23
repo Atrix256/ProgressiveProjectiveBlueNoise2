@@ -31,7 +31,7 @@ struct ComplexImage2D
     }
 };
 
-void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size_t width)
+void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size_t width, size_t numSamples_)
 {
     // convert the source image to complex so it can be DFTd
     ComplexImage2D complexImageIn(width, width);
@@ -44,6 +44,7 @@ void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size
     simple_fft::FFT(complexImageIn, complexImageOut, width, width, error);
 
     // get the magnitudes and max magnitude
+    float numSamples = float(numSamples_);
     std::vector<float> magnitudes;
     float maxMag = 0.0f;
     {
@@ -57,7 +58,7 @@ void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size
                 size_t srcX = (x + width / 2) % width;
 
                 const complex_type& c = complexImageOut(srcX, srcY);
-                float mag = float(sqrt(c.real()*c.real() + c.imag()*c.imag()));
+                float mag = float(sqrt(c.real()*c.real() + c.imag()*c.imag())) / numSamples;
                 maxMag = std::max(mag, maxMag);
                 *dest = mag;
                 ++dest;

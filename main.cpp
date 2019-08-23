@@ -59,7 +59,7 @@ int main(int argc, char** argv)
         GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(points, c_sampleCount, c_progProjCandidateMultiplier, true);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
-        DFT(image, imageDFT, c_imageSize);
+        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount);
         std::vector<uint8_t> imageU8 = ImageFloatToRGBAU8(image, c_imageSize);
         std::vector<uint8_t> imageDFTU8 = ImageFloatToRGBAU8(imageDFT, c_imageSize);
 
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
         MitchelsBestCandidateAlgorithm<2>(points, c_sampleCount, c_mitchelCandidateMultiplier);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
-        DFT(image, imageDFT, c_imageSize);
+        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount);
         std::vector<uint8_t> imageU8 = ImageFloatToRGBAU8(image, c_imageSize);
         std::vector<uint8_t> imageDFTU8 = ImageFloatToRGBAU8(imageDFT, c_imageSize);
 
@@ -90,7 +90,12 @@ int main(int argc, char** argv)
 TODO:
 
 * do radial periodogram also. Maybe min, max and average?
+
+* try mag squared again?
+
+
 * compare vs the "extra penalty"
+ * does that actually even do anything? might verify and see
 
 * compare your projective blue noise vs the actual projective blue noise
  * also make that projective blue noise progressive, using the thing from void and cluster algorithm
@@ -115,5 +120,21 @@ TESTS:
 - radial DFT?
 
 Get this into sample zoo!
+
+
+
+
+
+Notes:
+? were you going to co-author with brandon so it could be the wolfe-mann algorithm? :P
+* we are doing periodograms like in the subr16 paper linked below. currently not using squared mag though!
+
+
+The older progressive projective blue noise repo has some more links that aren't relevant to proj prog but sampling in general & sample zoo
+
+* This specifically has info about calculating the power spectrum (not fourier magnitude!), normalizing it, radial averaging it, and has c++ source code to do so.
+ * https://cs.dartmouth.edu/wjarosz/publications/subr16fourier.html
+
+* projective blue noise article: http://resources.mpi-inf.mpg.de/ProjectiveBlueNoise/
 
 */
