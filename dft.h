@@ -43,9 +43,6 @@ void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size
     ComplexImage2D complexImageOut(width, width);
     simple_fft::FFT(complexImageIn, complexImageOut, width, width, error);
 
-    // Clear out DC, we don't care about it
-    complexImageOut(0, 0) = 0.0f;
-
     // get the magnitudes and max magnitude
     std::vector<float> magnitudes;
     float maxMag = 0.0f;
@@ -69,7 +66,7 @@ void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size
     }
 
     // normalize the magnitudes
-    //const float c = 1.0f / log(1.0f / 255.0f + maxMag);
+    const float c = 1.0f / log(1.0f / 255.0f + maxMag);
     {
         imageDest.resize(width * width);
         const float* src = magnitudes.data();
@@ -78,8 +75,7 @@ void DFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size
         {
             for (size_t x = 0; x < width; ++x)
             {
-                //float normalized = c * log(1.0f / 255.0f + *src);
-                float normalized = *src / maxMag;
+                float normalized = c * log(1.0f / 255.0f + *src);
                 *dest = *src / maxMag;
 
                 ++src;
