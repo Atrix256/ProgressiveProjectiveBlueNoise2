@@ -10,6 +10,7 @@
 #include "BN_Mitchels.h"
 #include "BN_progproj.h"
 #include "dft.h"
+#include "scoped_timer.h"
 
 static const size_t c_sampleCount = 1000;
 static const size_t c_imageSize = 256;
@@ -20,8 +21,7 @@ static const size_t c_mitchelCandidateMultiplier = 1;
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
 static const size_t c_progProjCandidateMultiplier = 100;
-// TODO: are the numbers above properly tuned?
-
+// TODO: are the numbers above properly tuned? 10 seems to be as good as 100? but test radial one maybe
 
 typedef std::array<float, 2> Vec2;
 
@@ -54,6 +54,7 @@ std::vector<uint8_t> ImageFloatToRGBAU8(const std::vector<float>& image, size_t 
 int main(int argc, char** argv)
 {
     {
+        ScopedTimer timer("Progressive Projective Blue Noise");
         std::vector<Vec2> points;
         GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(points, c_sampleCount, c_progProjCandidateMultiplier, true);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
@@ -67,6 +68,7 @@ int main(int argc, char** argv)
     }
 
     {
+        ScopedTimer timer("Mitchel's Best Candidate Blue Noise");
         std::vector<Vec2> points;
         MitchelsBestCandidateAlgorithm<2>(points, c_sampleCount, c_mitchelCandidateMultiplier);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
@@ -90,16 +92,14 @@ TODO:
 * do radial periodogram also. Maybe min, max and average?
 * compare vs the "extra penalty"
 
-* maybe do the log coloring of the DFT!
-
 * compare your projective blue noise vs the actual projective blue noise
  * also make that projective blue noise progressive, using the thing from void and cluster algorithm
 
-* maybe compare against both white noise and regular blue noise
+* compare against white noise
 
 * show the extra penalty not working out
 
-* subspace projections
+* subspace projections you already have
 * random projections
 
 * Compare vs Eric heitz screen space blue noise, which should essentially be the same as random projections?
@@ -107,11 +107,12 @@ TODO:
  
 * also i think this relates to Matt Phar's talk about sample warping and stratified blue noise keeping better low discrepancy under sample warping.
 
+? do we care about higher dimensions
 
 TESTS:
 - show samples (2d)
 - DFT (2d)
-
+- radial DFT?
 
 Get this into sample zoo!
 
