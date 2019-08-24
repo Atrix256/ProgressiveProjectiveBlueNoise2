@@ -114,6 +114,8 @@ TODO:
 
 ? do we care about higher dimensions
 
+* also projective blue noise masks w/ modified void and cluster algorithm. maybe a second thing dunno.
+
 TESTS:
 - show samples (2d)
 - DFT (2d)

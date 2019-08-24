@@ -67,7 +67,7 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
     }
 
     // normalize the magnitudes
-    const float c = 1.0f / log(1.0f / 255.0f + maxMag);
+    const float c = 1.0f / log(1.0f + maxMag);
     {
         imageDest.resize(width * width);
         const float* src = magnitudes.data();
@@ -76,7 +76,7 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
         {
             for (size_t x = 0; x < width; ++x)
             {
-                float normalized = c * log(1.0f / 255.0f + *src);
+                float normalized = c * log(1.0f + *src);
                 *dest = *src / maxMag;
 
                 ++src;
