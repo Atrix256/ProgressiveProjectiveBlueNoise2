@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rng.h"
+#include <random>
 
 template <size_t DIMENSION, size_t PARTITIONS>
 struct GoodCandidateSubspace
@@ -167,11 +167,10 @@ struct GoodCandidateSubspace
 };
 
 template <size_t DIMENSION, size_t PARTITIONS, bool EXTRAPENALTY>
-void GoodCandidateSubspaceAlgorithmAccell(std::vector< std::array<float, DIMENSION>>& results, size_t desiredItemCount, int candidateMultiplier, bool reportProgress)
+void GoodCandidateSubspaceAlgorithmAccell(std::mt19937& rng, std::vector< std::array<float, DIMENSION>>& results, size_t desiredItemCount, int candidateMultiplier, bool reportProgress)
 {
     typedef std::array<float, DIMENSION> T;
 
-    static std::mt19937 rng = GetRNG();
     static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
     // map candidate index to score

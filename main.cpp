@@ -2,7 +2,8 @@
 
 static const size_t c_sampleCount = 1000;
 static const size_t c_imageSize = 256;
-static const size_t c_radialAverageBucketCount = 64; // TODO: tune this
+static const size_t c_radialAverageBucketCount = 64;
+static const size_t c_numTestsForAveraging = 10; // TODO: 10 isn't enough!
 
 // Mitchel's best candidate blue noise settings
 static const size_t c_mitchelCandidateMultiplier = 1;
@@ -12,7 +13,11 @@ static const size_t c_progProjAccelSize = 10;
 static const size_t c_progProjCandidateMultiplier = 10; // TODO: need to search for a good value here
 // TODO: are the numbers above properly tuned? 10 seems to be as good as 100? but test radial one maybe
 
+// TODO: when true, do the tests a bunch of times (how many? make a constant but set to what?) and average results. show averaged DFT and radial one. make it multi threaded to go as fast as possible. show progress
+#define DO_AVERAGE_TEST() false
 #define RANDOMIZE_SEEDS() false
+
+
 
 #include <array>
 #include <vector>
@@ -65,8 +70,9 @@ int main(int argc, char** argv)
 {
     {
         ScopedTimer timer("Progressive Projective Blue Noise");
+        std::mt19937 rng = GetRNG();
         std::vector<Vec2> points;
-        GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(points, c_sampleCount, c_progProjCandidateMultiplier, true);
+        GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, true);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
         std::vector<float> radialAveraged;
@@ -81,8 +87,9 @@ int main(int argc, char** argv)
 
     {
         ScopedTimer timer("Mitchel's Best Candidate Blue Noise");
+        std::mt19937 rng = GetRNG();
         std::vector<Vec2> points;
-        MitchelsBestCandidateAlgorithm<2>(points, c_sampleCount, c_mitchelCandidateMultiplier);
+        MitchelsBestCandidateAlgorithm<2>(rng, points, c_sampleCount, c_mitchelCandidateMultiplier);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
         std::vector<float> radialAveraged;
@@ -103,9 +110,7 @@ int main(int argc, char** argv)
 
 TODO:
 
-* average a bunch of radial ones together
- * get rid of DC
- * a define to do this test or not, since it takes a while.
+* make these tests run multithreaded, maybe at least when doing the same test N times, have that threaded.
 
 * use accel structure for regular blue noise too
 
