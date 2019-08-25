@@ -3,7 +3,6 @@
 #include "simple_fft/fft_settings.h"
 #include "simple_fft/fft.h"
 
-
 #include <algorithm>
 #include <vector>
 
@@ -31,7 +30,55 @@ struct ComplexImage2D
     }
 };
 
-void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size_t width, size_t numSamples_)
+template <typename T>
+T Lerp(T A, T B, float t)
+{
+    return T(float(A) * (1.0f - t) + float(B) * t);
+}
+
+void RadiallyAveragePowerSpectrum(const std::vector<float>& imageSrc, size_t imageWidth, std::vector<float>& output, size_t outputCount)
+{
+    output.clear();
+    output.resize(outputCount, 0.0f);
+
+    std::vector<size_t> outputCounts;
+    outputCounts.resize(outputCount, 0);
+
+    for (size_t index = 0; index < imageSrc.size(); ++index)
+    {
+        float x = float(index % imageWidth) - float(imageWidth / 2);
+        float y = float(index / imageWidth) - float(imageWidth / 2);
+
+        // ignore DC
+        if (x == 0 && y == 0)
+            continue;
+
+        float distance = sqrt(x*x + y * y);
+        distance /= float(imageWidth / 2);
+        distance /= sqrtf(2.0f);
+
+        size_t bucket = size_t(distance * float(outputCount));
+        if (bucket >= outputCount)
+            bucket = outputCount - 1;
+
+        outputCounts[bucket]++;
+        output[bucket] = Lerp(output[bucket], imageSrc[index], 1.0f / float(outputCounts[bucket]));
+    }
+
+    // get the maximum value in the output
+    float maxValue = output[0];
+    for (float f : output)
+    {
+        if (f > maxValue)
+            maxValue = f;
+    }
+
+    // normalize the output
+    for (float& f : output)
+        f /= maxValue;
+}
+
+void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size_t width, size_t numSamples_, std::vector<float>& radialAverage, size_t radialAverageCount)
 {
     // convert the source image to complex so it can be DFTd
     ComplexImage2D complexImageIn(width, width);
@@ -65,6 +112,9 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
             }
         }
     }
+
+    // make the radially averaged power spectrum
+    RadiallyAveragePowerSpectrum(magnitudes, width, radialAverage, radialAverageCount);
 
     // normalize the magnitudes
     const float c = 1.0f / log(1.0f + maxMag);

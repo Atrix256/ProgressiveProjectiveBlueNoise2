@@ -32,6 +32,7 @@
     <ClInclude Include="BN_progproj.h" />
     <ClInclude Include="dft.h" />
     <ClInclude Include="scoped_timer.h" />
+    <ClInclude Include="rng.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="stb">

@@ -1,8 +1,21 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+static const size_t c_sampleCount = 1000;
+static const size_t c_imageSize = 256;
+static const size_t c_radialAverageBucketCount = 64; // TODO: tune this
+
+// Mitchel's best candidate blue noise settings
+static const size_t c_mitchelCandidateMultiplier = 1;
+
+// Progressive Projective blue noise settings
+static const size_t c_progProjAccelSize = 10;
+static const size_t c_progProjCandidateMultiplier = 10; // TODO: need to search for a good value here
+// TODO: are the numbers above properly tuned? 10 seems to be as good as 100? but test radial one maybe
+
+#define RANDOMIZE_SEEDS() false
+
 #include <array>
 #include <vector>
-#include <random>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
@@ -11,17 +24,6 @@
 #include "BN_progproj.h"
 #include "dft.h"
 #include "scoped_timer.h"
-
-static const size_t c_sampleCount = 1000;
-static const size_t c_imageSize = 256;
-
-// Mitchel's best candidate blue noise settings
-static const size_t c_mitchelCandidateMultiplier = 1;
-
-// Progressive Projective blue noise settings
-static const size_t c_progProjAccelSize = 10;
-static const size_t c_progProjCandidateMultiplier = 100;
-// TODO: are the numbers above properly tuned? 10 seems to be as good as 100? but test radial one maybe
 
 typedef std::array<float, 2> Vec2;
 
@@ -51,6 +53,14 @@ std::vector<uint8_t> ImageFloatToU8(const std::vector<float>& image, size_t imag
     return ret;
 }
 
+void SaveCSV(const char* fileName, const std::vector<float>& spectrum)
+{
+    FILE* file = fopen(fileName, "w+b");
+    for (float f : spectrum)
+        fprintf(file, "\"%f\"\n", f);
+    fclose(file);
+}
+
 int main(int argc, char** argv)
 {
     {
@@ -59,12 +69,14 @@ int main(int argc, char** argv)
         GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(points, c_sampleCount, c_progProjCandidateMultiplier, true);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
-        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount);
+        std::vector<float> radialAveraged;
+        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
         std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
         std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
         stbi_write_png("out/BN_ProgProj.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
         stbi_write_png("out/BN_ProgProj_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+        SaveCSV("out/BN_ProgProj.csv", radialAveraged);
     }
 
     {
@@ -73,12 +85,14 @@ int main(int argc, char** argv)
         MitchelsBestCandidateAlgorithm<2>(points, c_sampleCount, c_mitchelCandidateMultiplier);
         std::vector<float> image = MakeSampleImage(points, c_imageSize);
         std::vector<float> imageDFT;
-        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount);
+        std::vector<float> radialAveraged;
+        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
         std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
         std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
         stbi_write_png("out/BN_Mitchels.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
         stbi_write_png("out/BN_Mitchels_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+        SaveCSV("out/BN_Mitchels.csv", radialAveraged);
     }
 
     system("pause");
@@ -89,10 +103,13 @@ int main(int argc, char** argv)
 
 TODO:
 
-* do radial periodogram also. Maybe min, max and average?
+* average a bunch of radial ones together
+ * get rid of DC
+ * a define to do this test or not, since it takes a while.
 
-* try mag squared again? Maybe the problem is sRGB lol.
+* use accel structure for regular blue noise too
 
+* make random numbers deterministic by default (make a define to use random instead of fixed seed?)
 
 * compare vs the "extra penalty"
  * does that actually even do anything? might verify and see
@@ -114,7 +131,7 @@ TODO:
 
 ? do we care about higher dimensions
 
-* also projective blue noise masks w/ modified void and cluster algorithm. maybe a second thing dunno.
+* also projective blue noise masks w/ modified void and cluster algorithm. maybe this as a second paper / investigation
 
 TESTS:
 - show samples (2d)

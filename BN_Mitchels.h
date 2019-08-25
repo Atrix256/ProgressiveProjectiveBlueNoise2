@@ -1,12 +1,13 @@
 #pragma once
 
+#include "rng.h"
+
 template <size_t DIMENSION>
 void MitchelsBestCandidateAlgorithm(std::vector< std::array<float, DIMENSION>>& results, size_t desiredItemCount, int candidateMultiplier)
 {
     typedef std::array<float, DIMENSION> T;
 
-    static std::random_device rd;
-    static std::mt19937 rng(rd());
+    static std::mt19937 rng = GetRNG();
     static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
     results.resize(desiredItemCount);
