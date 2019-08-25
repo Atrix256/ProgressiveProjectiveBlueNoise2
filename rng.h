@@ -21,7 +21,6 @@ std::mt19937 GetRNG(void)
         std::random_device rd("dev/random");
         for (int i = 0; i < 8; ++i)
             seed[i] = rd();
-        seeded = true;
     #endif
 
     std::seed_seq fullSeed{ seed[0], seed[1], seed[2], seed[3], seed[4], seed[5], seed[6], seed[7] };
