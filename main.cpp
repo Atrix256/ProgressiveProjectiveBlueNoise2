@@ -27,6 +27,7 @@ static const size_t c_progProjCandidateMultiplier = 10; // TODO: need to search 
 
 #include "BN_Mitchels.h"
 #include "BN_progproj.h"
+#include "rng.h"
 #include "dft.h"
 #include "scoped_timer.h"
 
