@@ -103,6 +103,30 @@ int main(int argc, char** argv)
         SaveCSV("out/BN_Mitchels.csv", radialAveraged);
     }
 
+    {
+        ScopedTimer timer("White Noise");
+        std::mt19937 rng = GetRNG();
+        std::vector<Vec2> points;
+        points.resize(c_sampleCount);
+        static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        for (Vec2& v : points)
+        {
+            v[0] = dist(rng);
+            v[1] = dist(rng);
+        }
+
+        std::vector<float> image = MakeSampleImage(points, c_imageSize);
+        std::vector<float> imageDFT;
+        std::vector<float> radialAveraged;
+        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
+        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
+        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
+
+        stbi_write_png("out/White.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
+        stbi_write_png("out/White_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+        SaveCSV("out/White.csv", radialAveraged);
+    }
+
     system("pause");
     return 0;
 }
@@ -115,20 +139,15 @@ TODO:
 
 * use accel structure for regular blue noise too
 
-* make random numbers deterministic by default (make a define to use random instead of fixed seed?)
-
 * compare vs the "extra penalty"
  * does that actually even do anything? might verify and see
 
 * compare your projective blue noise vs the actual projective blue noise
  * also make that projective blue noise progressive, using the thing from void and cluster algorithm
 
-* compare against white noise
-
 * show the extra penalty not working out
 
-* subspace projections you already have
-* random projections
+* subspace projections you already have, need to try random projections
 
 * Compare vs Eric heitz screen space blue noise, which should essentially be the same as random projections?
  * The Eric heitz screen space blue noise is related because it's optimized against random heaviside functions, so is basically projective blue noise on all axes
