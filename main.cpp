@@ -10,11 +10,9 @@ static const size_t c_mitchelCandidateMultiplier = 1;
 
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
-static const size_t c_progProjCandidateMultiplier = 10; // TODO: need to search for a good value here
-// TODO: are the numbers above properly tuned? 10 seems to be as good as 100? but test radial one maybe
+static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search for a good value here
 
-// TODO: when true, do the tests a bunch of times (how many? make a constant but set to what?) and average results. show averaged DFT and radial one. make it multi threaded to go as fast as possible. show progress
-#define DO_AVERAGE_TEST() false
+#define DO_AVERAGE_TEST() true
 #define RANDOMIZE_SEEDS() false
 
 
@@ -30,6 +28,8 @@ static const size_t c_progProjCandidateMultiplier = 10; // TODO: need to search 
 #include "rng.h"
 #include "dft.h"
 #include "scoped_timer.h"
+
+#define NUM_TESTS() (DO_AVERAGE_TEST() ? c_numTestsForAveraging : 1)
 
 typedef std::array<float, 2> Vec2;
 
@@ -67,23 +67,58 @@ void SaveCSV(const char* fileName, const std::vector<float>& spectrum)
     fclose(file);
 }
 
+template <typename T>
+void IncrementalAverage(const std::vector<T>& src, std::vector<T>& dest, size_t sampleIndex)
+{
+    if (sampleIndex == 0)
+    {
+        dest = src;
+        return;
+    }
+
+    for (size_t index = 0; index < src.size(); ++index)
+        dest[index] = Lerp(dest[index], src[index], 1.0f / float(sampleIndex + 1));
+}
+
 int main(int argc, char** argv)
 {
     {
         ScopedTimer timer("Progressive Projective Blue Noise");
         std::mt19937 rng = GetRNG();
-        std::vector<Vec2> points;
-        GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, true);
-        std::vector<float> image = MakeSampleImage(points, c_imageSize);
-        std::vector<float> imageDFT;
-        std::vector<float> radialAveraged;
-        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
-        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
-        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
-        stbi_write_png("out/BN_ProgProj.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
-        stbi_write_png("out/BN_ProgProj_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
-        SaveCSV("out/BN_ProgProj.csv", radialAveraged);
+        #if DO_AVERAGE_TEST()
+            std::vector<float> radialAveraged_avg;
+            std::vector<uint8_t> imageDFTU8_avg;
+        #endif
+
+        for (size_t testIndex = 0; testIndex < NUM_TESTS(); ++testIndex)
+        {
+            std::vector<Vec2> points;
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, true);
+            std::vector<float> image = MakeSampleImage(points, c_imageSize);
+            std::vector<float> imageDFT;
+            std::vector<float> radialAveraged;
+            DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
+            std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
+            std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
+
+            if (testIndex == 0)
+            {
+                stbi_write_png("out/BN_ProgProj_one.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
+                stbi_write_png("out/BN_ProgProj_DFT_one.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+                SaveCSV("out/BN_ProgProj_one.csv", radialAveraged);
+            }
+
+            #if DO_AVERAGE_TEST()
+                IncrementalAverage(radialAveraged, radialAveraged_avg, testIndex);
+                IncrementalAverage(imageDFTU8, imageDFTU8_avg, testIndex);
+            #endif
+        }
+
+        #if DO_AVERAGE_TEST()
+            stbi_write_png("out/BN_ProgProj_DFT_avg.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
+            SaveCSV("out/BN_ProgProj_avg.csv", radialAveraged_avg);
+        #endif
     }
 
     {
