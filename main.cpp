@@ -12,7 +12,7 @@ static const size_t c_mitchelCandidateMultiplier = 1;
 static const size_t c_progProjAccelSize = 10;
 static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search for a good value here
 
-#define DO_AVERAGE_TEST() true
+#define DO_AVERAGE_TEST() false
 #define RANDOMIZE_SEEDS() false
 
 
@@ -144,8 +144,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     }
 
     // report the averages
-    char fileName[1024];
     #if DO_AVERAGE_TEST()
+        char fileName[1024];
         sprintf(fileName, "%s_DFT_avg.png", baseFileName);
         stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
         sprintf(fileName, "%s_avg.csv", baseFileName);
@@ -195,8 +195,6 @@ int main(int argc, char** argv)
 /*
 
 TODO:
-
-* make these tests run multithreaded, maybe at least when doing the same test N times, have that threaded.
 
 * use accel structure for regular blue noise too
 
