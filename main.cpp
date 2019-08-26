@@ -10,7 +10,7 @@ static const size_t c_mitchelCandidateMultiplier = 1;
 
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
-static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search for a good value here
+static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search for a good value here. Maybe get rid of this constant but need to compare different values
 
 #define DO_AVERAGE_TEST() true
 #define RANDOMIZE_SEEDS() false
@@ -156,6 +156,29 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 int main(int argc, char** argv)
 {
     DoTest(
+        "Progressive Projective Blue Noise 25",
+        "out/BN_ProgProj_25",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 25, false);
+        }
+    );
+
+    return 0;
+
+    DoTest(
+        "Progressive Projective Blue Noise 5 Penalty",
+        "out/BN_ProgProj_5Penalty",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 5, false);
+        }
+    );
+
+
+    return 0;
+
+    DoTest(
         "Progressive Projective Blue Noise",
         "out/BN_ProgProj",
         [](std::mt19937& rng, std::vector<Vec2>& points)
@@ -215,6 +238,8 @@ int main(int argc, char** argv)
 TODO:
 
 * try 10x, and 5x penalty.
+
+* need to do 1d dft of x and y projections, as well as some number of other projections. Porbably golden ratio angles on 180 degrees?
 
 * use accel structure for regular blue noise too
 
