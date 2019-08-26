@@ -138,46 +138,29 @@ int main(int argc, char** argv)
         }
     );
 
-    {
-        ScopedTimer timer("Mitchel's Best Candidate Blue Noise");
-        std::mt19937 rng = GetRNG();
-        std::vector<Vec2> points;
-        MitchelsBestCandidateAlgorithm<2>(rng, points, c_sampleCount, c_mitchelCandidateMultiplier);
-        std::vector<float> image = MakeSampleImage(points, c_imageSize);
-        std::vector<float> imageDFT;
-        std::vector<float> radialAveraged;
-        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
-        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
-        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
-
-        stbi_write_png("out/BN_Mitchels.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
-        stbi_write_png("out/BN_Mitchels_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
-        SaveCSV("out/BN_Mitchels.csv", radialAveraged);
-    }
-
-    {
-        ScopedTimer timer("White Noise");
-        std::mt19937 rng = GetRNG();
-        std::vector<Vec2> points;
-        points.resize(c_sampleCount);
-        static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-        for (Vec2& v : points)
+    DoTest(
+        "Mitchel's Best Candidate Blue Noise",
+        "out/BN_Mitchels",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            v[0] = dist(rng);
-            v[1] = dist(rng);
+            MitchelsBestCandidateAlgorithm<2>(rng, points, c_sampleCount, c_mitchelCandidateMultiplier);
         }
+    );
 
-        std::vector<float> image = MakeSampleImage(points, c_imageSize);
-        std::vector<float> imageDFT;
-        std::vector<float> radialAveraged;
-        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
-        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
-        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
-
-        stbi_write_png("out/White.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
-        stbi_write_png("out/White_DFT.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
-        SaveCSV("out/White.csv", radialAveraged);
-    }
+    DoTest(
+        "White Noise",
+        "out/White",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            points.resize(c_sampleCount);
+            static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+            for (Vec2& v : points)
+            {
+                v[0] = dist(rng);
+                v[1] = dist(rng);
+            }
+        }
+    );
 
     system("pause");
     return 0;
