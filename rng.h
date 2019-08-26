@@ -2,20 +2,19 @@
 
 #include <random>
 
-std::mt19937 GetRNG(void)
+std::mt19937 GetRNG(uint32_t contextIndex)
 {
-    static uint32_t seed[8] =
+    uint32_t seed[8] =
     {
-        377243142,
-        3379348808,
-        3529983610,
-        2483992069,
-        2532182207,
-        600251115,
-        3649906436,
-        3065633521
+        377243142 ^ contextIndex,
+        3379348808 ^ contextIndex,
+        3529983610 ^ contextIndex,
+        2483992069 ^ contextIndex,
+        2532182207 ^ contextIndex,
+        600251115 ^ contextIndex,
+        3649906436 ^ contextIndex,
+        3065633521 ^ contextIndex
     };
-
 
     #if RANDOMIZE_SEEDS()
         std::random_device rd("dev/random");

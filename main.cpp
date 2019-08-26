@@ -19,6 +19,8 @@ static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search f
 
 #include <array>
 #include <vector>
+#include <thread>
+#include <atomic>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
@@ -83,42 +85,66 @@ void IncrementalAverage(const std::vector<T>& src, std::vector<T>& dest, size_t 
 template <typename LAMBDA>
 void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 {
-    char fileName[1024];
     ScopedTimer timer(label);
-    std::mt19937 rng = GetRNG();
 
-    #if DO_AVERAGE_TEST()
-        std::vector<float> radialAveraged_avg;
-        std::vector<uint8_t> imageDFTU8_avg;
-    #endif
+    size_t numThreads = std::thread::hardware_concurrency();
+    std::vector<std::thread> threads(numThreads);
+    std::vector<std::vector<float>> radialAverageds(NUM_TESTS());
+    std::vector<std::vector<uint8_t>> imageDFTU8s(NUM_TESTS());
 
-    for (size_t testIndex = 0; testIndex < NUM_TESTS(); ++testIndex)
+    std::atomic<size_t> nextIndex(0);
+    for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
-        std::vector<Vec2> points;
-        lambda(rng, points);
-        std::vector<float> image = MakeSampleImage(points, c_imageSize);
-        std::vector<float> imageDFT;
-        std::vector<float> radialAveraged;
-        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
-        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
-        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
+        threads[threadIndex] = std::thread(
+            [threadIndex, baseFileName, &radialAverageds, &imageDFTU8s, &nextIndex, &lambda]()
+            {
+                char fileName[1024];
 
-        if (testIndex == 0)
-        {
-            sprintf(fileName, "%s_one.png", baseFileName);
-            stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
-            sprintf(fileName, "%s_DFT_one.png", baseFileName);
-            stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
-            sprintf(fileName, "%s_one.csv", baseFileName);
-            SaveCSV(fileName, radialAveraged);
-        }
+                size_t testIndex = nextIndex.fetch_add(1);
+                while (testIndex < NUM_TESTS())
+                {
+                    std::mt19937 rng = GetRNG(uint32_t(testIndex));
+                    std::vector<Vec2> points;
+                    lambda(rng, points);
+                    std::vector<float> image = MakeSampleImage(points, c_imageSize);
+                    std::vector<float> imageDFT;
+                    std::vector<float>& radialAveraged = radialAverageds[testIndex];
+                    DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
+                    std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
 
-        #if DO_AVERAGE_TEST()
-            IncrementalAverage(radialAveraged, radialAveraged_avg, testIndex);
-            IncrementalAverage(imageDFTU8, imageDFTU8_avg, testIndex);
-        #endif
+                    std::vector<uint8_t>& imageDFTU8 = imageDFTU8s[testIndex];
+                    imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
+
+                    if (testIndex == 0)
+                    {
+                        sprintf(fileName, "%s_one.png", baseFileName);
+                        stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
+                        sprintf(fileName, "%s_DFT_one.png", baseFileName);
+                        stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+                        sprintf(fileName, "%s_one.csv", baseFileName);
+                        SaveCSV(fileName, radialAveraged);
+                    }
+
+                    // get next test index to do
+                    testIndex = nextIndex.fetch_add(1);
+                }
+            }
+        );
+    }
+    for (std::thread& t : threads)
+        t.join();
+
+    // combine the work of all the threads
+    std::vector<float> radialAveraged_avg;
+    std::vector<uint8_t> imageDFTU8_avg;
+    for (size_t index = 0; index < radialAverageds.size(); ++index)
+    {
+        IncrementalAverage(radialAverageds[index], radialAveraged_avg, index);
+        IncrementalAverage(imageDFTU8s[index], imageDFTU8_avg, index);
     }
 
+    // report the averages
+    char fileName[1024];
     #if DO_AVERAGE_TEST()
         sprintf(fileName, "%s_DFT_avg.png", baseFileName);
         stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
@@ -134,7 +160,7 @@ int main(int argc, char** argv)
         "out/BN_ProgProj",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, true);
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, false);
         }
     );
 
