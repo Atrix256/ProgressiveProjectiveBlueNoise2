@@ -3,7 +3,7 @@
 static const size_t c_sampleCount = 1000;
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
-static const size_t c_numTestsForAveraging = 10; // TODO: 10 isn't enough!
+static const size_t c_numTestsForAveraging = 100;
 
 // Mitchel's best candidate blue noise settings
 static const size_t c_mitchelCandidateMultiplier = 1;
@@ -12,7 +12,7 @@ static const size_t c_mitchelCandidateMultiplier = 1;
 static const size_t c_progProjAccelSize = 10;
 static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search for a good value here
 
-#define DO_AVERAGE_TEST() false
+#define DO_AVERAGE_TEST() true
 #define RANDOMIZE_SEEDS() false
 
 
