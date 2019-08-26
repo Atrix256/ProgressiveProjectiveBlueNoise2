@@ -165,6 +165,24 @@ int main(int argc, char** argv)
     );
 
     DoTest(
+        "Progressive Projective Blue Noise 5",
+        "out/BN_ProgProj_5",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 5, false);
+        }
+    );
+
+    DoTest(
+        "Progressive Projective Blue Noise Penalty",
+        "out/BN_ProgProj_Penalty",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, false);
+        }
+    );
+
+    DoTest(
         "Mitchel's Best Candidate Blue Noise",
         "out/BN_Mitchels",
         [](std::mt19937& rng, std::vector<Vec2>& points)
@@ -195,6 +213,8 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+* try 10x, and 5x penalty.
 
 * use accel structure for regular blue noise too
 
