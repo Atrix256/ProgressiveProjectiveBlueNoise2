@@ -80,46 +80,63 @@ void IncrementalAverage(const std::vector<T>& src, std::vector<T>& dest, size_t 
         dest[index] = Lerp(dest[index], src[index], 1.0f / float(sampleIndex + 1));
 }
 
-int main(int argc, char** argv)
+template <typename LAMBDA>
+void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 {
+    char fileName[1024];
+    ScopedTimer timer(label);
+    std::mt19937 rng = GetRNG();
+
+    #if DO_AVERAGE_TEST()
+        std::vector<float> radialAveraged_avg;
+        std::vector<uint8_t> imageDFTU8_avg;
+    #endif
+
+    for (size_t testIndex = 0; testIndex < NUM_TESTS(); ++testIndex)
     {
-        ScopedTimer timer("Progressive Projective Blue Noise");
-        std::mt19937 rng = GetRNG();
+        std::vector<Vec2> points;
+        lambda(rng, points);
+        std::vector<float> image = MakeSampleImage(points, c_imageSize);
+        std::vector<float> imageDFT;
+        std::vector<float> radialAveraged;
+        DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
+        std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
+        std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
-        #if DO_AVERAGE_TEST()
-            std::vector<float> radialAveraged_avg;
-            std::vector<uint8_t> imageDFTU8_avg;
-        #endif
-
-        for (size_t testIndex = 0; testIndex < NUM_TESTS(); ++testIndex)
+        if (testIndex == 0)
         {
-            std::vector<Vec2> points;
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, true);
-            std::vector<float> image = MakeSampleImage(points, c_imageSize);
-            std::vector<float> imageDFT;
-            std::vector<float> radialAveraged;
-            DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
-            std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
-            std::vector<uint8_t> imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
-
-            if (testIndex == 0)
-            {
-                stbi_write_png("out/BN_ProgProj_one.png", int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
-                stbi_write_png("out/BN_ProgProj_DFT_one.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
-                SaveCSV("out/BN_ProgProj_one.csv", radialAveraged);
-            }
-
-            #if DO_AVERAGE_TEST()
-                IncrementalAverage(radialAveraged, radialAveraged_avg, testIndex);
-                IncrementalAverage(imageDFTU8, imageDFTU8_avg, testIndex);
-            #endif
+            sprintf(fileName, "%s_one.png", baseFileName);
+            stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
+            sprintf(fileName, "%s_DFT_one.png", baseFileName);
+            stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+            sprintf(fileName, "%s_one.csv", baseFileName);
+            SaveCSV(fileName, radialAveraged);
         }
 
         #if DO_AVERAGE_TEST()
-            stbi_write_png("out/BN_ProgProj_DFT_avg.png", int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
-            SaveCSV("out/BN_ProgProj_avg.csv", radialAveraged_avg);
+            IncrementalAverage(radialAveraged, radialAveraged_avg, testIndex);
+            IncrementalAverage(imageDFTU8, imageDFTU8_avg, testIndex);
         #endif
     }
+
+    #if DO_AVERAGE_TEST()
+        sprintf(fileName, "%s_DFT_avg.png", baseFileName);
+        stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
+        sprintf(fileName, "%s_avg.csv", baseFileName);
+        SaveCSV(fileName, radialAveraged_avg);
+    #endif
+}
+
+int main(int argc, char** argv)
+{
+    DoTest(
+        "Progressive Projective Blue Noise",
+        "out/BN_ProgProj",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, true);
+        }
+    );
 
     {
         ScopedTimer timer("Mitchel's Best Candidate Blue Noise");
