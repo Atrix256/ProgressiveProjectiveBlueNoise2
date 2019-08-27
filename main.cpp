@@ -4,17 +4,13 @@ static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purpo
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
 static const size_t c_numTestsForAveraging = 100;
-static const size_t c_numProjections = 2;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N  // TODO: 8!
-
-// Mitchel's best candidate blue noise settings
-
-static const size_t c_mitchelCandidateMultiplier = 1;
+static const size_t c_numProjections = 8;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N
 
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
 
-#define DO_AVERAGE_TEST() false
-#define DO_SLOW_TESTS() false
+#define DO_AVERAGE_TEST() true
+#define DO_SLOW_TESTS() true
 #define RANDOMIZE_SEEDS() false
 
 
@@ -69,6 +65,14 @@ void SaveCSV(const char* fileName, const std::vector<float>& data)
     FILE* file = fopen(fileName, "w+b");
     for (float f : data)
         fprintf(file, "\"%f\"\n", f);
+    fclose(file);
+}
+
+void SaveCSV(const char* fileName, const std::vector<Vec2>& data)
+{
+    FILE* file = fopen(fileName, "w+b");
+    for (const Vec2& v: data)
+        fprintf(file, "%f, %f\n", v[0], v[1]);
     fclose(file);
 }
 
@@ -169,6 +173,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         SaveCSV(fileName, radialAveraged);
                         sprintf(fileName, "%s_projections_one.csv", baseFileName);
                         SaveCSV(fileName, DFTs);
+                        sprintf(fileName, "%s.txt", baseFileName);
+                        SaveCSV(fileName, points);
                     }
 
                     // get next test index to do
@@ -258,7 +264,7 @@ int main(int argc, char** argv)
         "out/BN_Mitchels",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            MitchelsBestCandidateAlgorithm<2>(rng, points, c_sampleCount, c_mitchelCandidateMultiplier);
+            MitchelsBestCandidateAlgorithm<2>(rng, points, c_sampleCount, 1);
         }
     );
 
