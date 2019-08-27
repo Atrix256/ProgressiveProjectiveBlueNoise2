@@ -30,6 +30,28 @@ struct ComplexImage2D
     }
 };
 
+struct ComplexImage1D
+{
+    ComplexImage1D(size_t w)
+    {
+        m_width = w;
+        pixels.resize(w, real_type(0.0f));
+    }
+
+    size_t m_width;
+    std::vector<complex_type> pixels;
+
+    complex_type& operator()(size_t x)
+    {
+        return pixels[x];
+    }
+
+    const complex_type& operator()(size_t x) const
+    {
+        return pixels[x];
+    }
+};
+
 template <typename T>
 T Lerp(T A, T B, float t)
 {
@@ -117,7 +139,7 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
     RadiallyAveragePowerSpectrum(magnitudes, width, radialAverage, radialAverageCount);
 
     // normalize the magnitudes
-    const float c = 1.0f / log(1.0f + maxMag);
+    //const float c = 1.0f / log(1.0f + maxMag);
     {
         imageDest.resize(width * width);
         const float* src = magnitudes.data();
@@ -126,12 +148,64 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
         {
             for (size_t x = 0; x < width; ++x)
             {
-                float normalized = c * log(1.0f + *src);
+                //float normalized = c * log(1.0f + *src);
                 *dest = *src / maxMag;
 
                 ++src;
                 ++dest;
             }
+        }
+    }
+}
+
+void DFT1D(const std::vector<float>& imageSrc, std::vector<float>& imageDest)
+{
+    // convert the source image to float and store it as complex so it can be DFTd
+    size_t width = imageSrc.size();
+    ComplexImage1D complexImageIn(width);
+    for (size_t index = 0, count = width; index < count; ++index)
+        complexImageIn.pixels[index] = imageSrc[index];
+
+    // DFT the image to get frequency of the samples
+    const char* error = nullptr;
+    ComplexImage1D complexImageOut(width);
+    simple_fft::FFT(complexImageIn, complexImageOut, width, error);
+
+    // Zero out DC, we don't really care about it, and the value is huge.
+    complexImageOut(0) = 0.0f;
+
+    // get the magnitudes and max magnitude
+    std::vector<float> magnitudes;
+    float maxMag = 0.0f;
+    {
+        magnitudes.resize(width, 0.0f);
+        float* dest = magnitudes.data();
+        for (size_t x = 0; x < width; ++x)
+        {
+            size_t srcX = (x + width / 2) % width;
+
+            const complex_type& c = complexImageOut(srcX);
+            float mag = float(sqrt(c.real()*c.real() + c.imag()*c.imag()));
+            maxMag = std::max(mag, maxMag);
+            *dest = mag;
+            ++dest;
+        }
+    }
+
+    // normalize the magnitudes and convert it back to a type T image
+    const float c = 1.0f / log(1.0f + maxMag);
+    {
+        imageDest.resize(width);
+        const float* src = magnitudes.data();
+        float* dest = imageDest.data();
+        for (size_t x = 0; x < width; ++x)
+        {
+            //float normalized = c * log(1.0f / 255.0f + *src);
+            float normalized = *src / maxMag;
+            *dest = normalized;
+
+            ++src;
+            ++dest;
         }
     }
 }

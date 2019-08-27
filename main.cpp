@@ -1,20 +1,21 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-static const size_t c_sampleCount = 1000;
+static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purposes.
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
 static const size_t c_numTestsForAveraging = 100;
+static const size_t c_numProjections = 2;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N  // TODO: 8!
 
 // Mitchel's best candidate blue noise settings
+
 static const size_t c_mitchelCandidateMultiplier = 1;
 
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
-static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search for a good value here. Maybe get rid of this constant but need to compare different values
 
-#define DO_AVERAGE_TEST() true
+#define DO_AVERAGE_TEST() false
+#define DO_SLOW_TESTS() false
 #define RANDOMIZE_SEEDS() false
-
 
 
 #include <array>
@@ -32,6 +33,8 @@ static const size_t c_progProjCandidateMultiplier = 1; // TODO: need to search f
 #include "scoped_timer.h"
 
 #define NUM_TESTS() (DO_AVERAGE_TEST() ? c_numTestsForAveraging : 1)
+
+static const float c_pi = 3.14159265359f;
 
 typedef std::array<float, 2> Vec2;
 
@@ -61,11 +64,26 @@ std::vector<uint8_t> ImageFloatToU8(const std::vector<float>& image, size_t imag
     return ret;
 }
 
-void SaveCSV(const char* fileName, const std::vector<float>& spectrum)
+void SaveCSV(const char* fileName, const std::vector<float>& data)
 {
     FILE* file = fopen(fileName, "w+b");
-    for (float f : spectrum)
+    for (float f : data)
         fprintf(file, "\"%f\"\n", f);
+    fclose(file);
+}
+
+template<size_t NumColumns>
+void SaveCSV(const char* fileName, const std::array<std::vector<float>, NumColumns>& data)
+{
+    FILE* file = fopen(fileName, "w+b");
+
+    for (size_t row = 0; row < data[0].size(); ++row)
+    {
+        for (size_t column = 0; column < NumColumns; ++column)
+            fprintf(file, "\"%f\",", data[column][row]);
+        fprintf(file, "\n");
+    }
+
     fclose(file);
 }
 
@@ -91,30 +109,56 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     std::vector<std::thread> threads(numThreads);
     std::vector<std::vector<float>> radialAverageds(NUM_TESTS());
     std::vector<std::vector<uint8_t>> imageDFTU8s(NUM_TESTS());
+    std::vector<std::array<std::vector<float>, c_numProjections>> projectionDFTs(NUM_TESTS());
 
     std::atomic<size_t> nextIndex(0);
     for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
         threads[threadIndex] = std::thread(
-            [threadIndex, baseFileName, &radialAverageds, &imageDFTU8s, &nextIndex, &lambda]()
+            [threadIndex, baseFileName, &radialAverageds, &imageDFTU8s, &projectionDFTs, &nextIndex, &lambda]()
             {
                 char fileName[1024];
 
                 size_t testIndex = nextIndex.fetch_add(1);
                 while (testIndex < NUM_TESTS())
                 {
+                    // make the points
                     std::mt19937 rng = GetRNG(uint32_t(testIndex));
                     std::vector<Vec2> points;
                     lambda(rng, points);
+
+                    // make an image of the samples
                     std::vector<float> image = MakeSampleImage(points, c_imageSize);
+
+                    // DFT the image and get the radial average as well
                     std::vector<float> imageDFT;
                     std::vector<float>& radialAveraged = radialAverageds[testIndex];
                     DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
                     std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
 
+                    // convert the DFT to a U8 image
                     std::vector<uint8_t>& imageDFTU8 = imageDFTU8s[testIndex];
                     imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
 
+                    // do projection DFTs
+                    std::array<std::vector<float>, c_numProjections>& DFTs = projectionDFTs[testIndex];
+                    for (size_t dftIndex = 0; dftIndex < c_numProjections; ++dftIndex)
+                    {
+                        std::vector<float> projectedValues(points.size());
+                        float angle = c_pi * float(dftIndex) / float(c_numProjections);
+                        float px = cos(angle);
+                        float py = sin(angle);
+                        for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
+                        {
+                            projectedValues[pointIndex] =
+                                points[pointIndex][0] * px +
+                                points[pointIndex][1] * py;
+                        }
+
+                        DFT1D(projectedValues, DFTs[dftIndex]);
+                    }
+
+                    // if this is the first test, write out the "one" images
                     if (testIndex == 0)
                     {
                         sprintf(fileName, "%s_one.png", baseFileName);
@@ -123,6 +167,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
                         sprintf(fileName, "%s_one.csv", baseFileName);
                         SaveCSV(fileName, radialAveraged);
+                        sprintf(fileName, "%s_projections_one.csv", baseFileName);
+                        SaveCSV(fileName, DFTs);
                     }
 
                     // get next test index to do
@@ -137,10 +183,13 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     // combine the work of all the threads
     std::vector<float> radialAveraged_avg;
     std::vector<uint8_t> imageDFTU8_avg;
+    std::array<std::vector<float>, c_numProjections> DFTs_avg;
     for (size_t index = 0; index < radialAverageds.size(); ++index)
     {
         IncrementalAverage(radialAverageds[index], radialAveraged_avg, index);
         IncrementalAverage(imageDFTU8s[index], imageDFTU8_avg, index);
+        for (size_t projIndex = 0; projIndex < c_numProjections; ++projIndex)
+            IncrementalAverage(projectionDFTs[index][projIndex], DFTs_avg[projIndex], index);
     }
 
     // report the averages
@@ -150,40 +199,29 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
         sprintf(fileName, "%s_avg.csv", baseFileName);
         SaveCSV(fileName, radialAveraged_avg);
+        sprintf(fileName, "%s_projections_avg.csv", baseFileName);
+        SaveCSV(fileName, DFTs_avg);
     #endif
 }
 
 int main(int argc, char** argv)
 {
     DoTest(
-        "Progressive Projective Blue Noise 25",
-        "out/BN_ProgProj_25",
-        [](std::mt19937& rng, std::vector<Vec2>& points)
-        {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 25, false);
-        }
-    );
-
-    return 0;
-
-    DoTest(
-        "Progressive Projective Blue Noise 5 Penalty",
-        "out/BN_ProgProj_5Penalty",
-        [](std::mt19937& rng, std::vector<Vec2>& points)
-        {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 5, false);
-        }
-    );
-
-
-    return 0;
-
-    DoTest(
         "Progressive Projective Blue Noise",
         "out/BN_ProgProj",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, false);
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 1, false);
+        }
+    );
+
+#if DO_SLOW_TESTS()
+    DoTest(
+        "Progressive Projective Blue Noise Penalty",
+        "out/BN_ProgProj_Penalty",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 1, false);
         }
     );
 
@@ -197,13 +235,23 @@ int main(int argc, char** argv)
     );
 
     DoTest(
-        "Progressive Projective Blue Noise Penalty",
-        "out/BN_ProgProj_Penalty",
+        "Progressive Projective Blue Noise 5 Penalty",
+        "out/BN_ProgProj_5Penalty",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, c_progProjCandidateMultiplier, false);
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 5, false);
         }
     );
+
+    DoTest(
+        "Progressive Projective Blue Noise 25",
+        "out/BN_ProgProj_25",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 25, false);
+        }
+    );
+#endif
 
     DoTest(
         "Mitchel's Best Candidate Blue Noise",
@@ -237,7 +285,18 @@ int main(int argc, char** argv)
 
 TODO:
 
+* projective blue noise thing doesn't seem to be working. the projections don't look good at all.
+ * probably need to try averaging 100 tests? dunno... a single test should show something shouldn't it?
+
+* in 2d DFT, you aren't using the normalized term! no wonder it wasn't working. check it out. try sRGB correction etc again
+
+* can we provide labels for the projective DFTs somehow?
+
+* remake everything since you bumped it to 1024.
+
 * try 10x, and 5x penalty.
+ * I did... cant' seem to get better blue noise characteristics.
+ * review your code, make sure it's working correctly
 
 * need to do 1d dft of x and y projections, as well as some number of other projections. Porbably golden ratio angles on 180 degrees?
 
