@@ -29,10 +29,11 @@
     <ClInclude Include="simple_fft\fft_settings.h">
       <Filter>simple_fft</Filter>
     </ClInclude>
-    <ClInclude Include="BN_progproj.h" />
     <ClInclude Include="dft.h" />
     <ClInclude Include="scoped_timer.h" />
     <ClInclude Include="rng.h" />
+    <ClInclude Include="BN_progprojRank.h" />
+    <ClInclude Include="BN_progprojMin.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="stb">
@@ -41,5 +42,8 @@
     <Filter Include="simple_fft">
       <UniqueIdentifier>{8861df87-aaf2-485d-a92d-403192f167b5}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="BN_accel.h" />
   </ItemGroup>
 </Project>

@@ -119,7 +119,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BN_Mitchels.h" />
-    <ClInclude Include="BN_progproj.h" />
+    <ClInclude Include="BN_progprojMin.h" />
+    <ClInclude Include="BN_progprojRank.h" />
     <ClInclude Include="dft.h" />
     <ClInclude Include="rng.h" />
     <ClInclude Include="scoped_timer.h" />
@@ -131,6 +132,9 @@
     <ClInclude Include="simple_fft\fft_impl.hpp" />
     <ClInclude Include="simple_fft\fft_settings.h" />
     <ClInclude Include="stb\stb_image_write.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="BN_accel.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

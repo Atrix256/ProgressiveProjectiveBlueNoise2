@@ -23,7 +23,8 @@ static const size_t c_progProjAccelSize = 10;
 #include "stb/stb_image_write.h"
 
 #include "BN_Mitchels.h"
-#include "BN_progproj.h"
+#include "BN_progprojRank.h"
+#include "BN_progprojMin.h"
 #include "rng.h"
 #include "dft.h"
 #include "scoped_timer.h"
@@ -213,48 +214,59 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 int main(int argc, char** argv)
 {
     DoTest(
-        "Progressive Projective Blue Noise",
-        "out/BN_ProgProj",
+        "Progressive Projective Blue Noise Min",
+        "out/BN_ProgProjMin",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 1, false);
+            GoodCandidateSubspaceAlgorithmAccell_Min<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 1, false);
+        }
+    );
+
+    return 0;
+
+    DoTest(
+        "Progressive Projective Blue Noise Rank",
+        "out/BN_ProgProjRank",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell_Rank<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 1, false);
         }
     );
 
 #if DO_SLOW_TESTS()
     DoTest(
-        "Progressive Projective Blue Noise Penalty",
-        "out/BN_ProgProj_Penalty",
+        ""Progressive Projective Blue Noise Rank Penalty",
+        "out/BN_ProgProjRank_Penalty",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 1, false);
+        GoodCandidateSubspaceAlgorithmAccell_Rank<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 1, false);
         }
     );
 
     DoTest(
-        "Progressive Projective Blue Noise 5",
-        "out/BN_ProgProj_5",
+        ""Progressive Projective Blue Noise Rank 5",
+        "out/BN_ProgProjRank_5",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 5, false);
+        GoodCandidateSubspaceAlgorithmAccell_Rank<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 5, false);
         }
     );
 
     DoTest(
-        "Progressive Projective Blue Noise 5 Penalty",
-        "out/BN_ProgProj_5Penalty",
+        ""Progressive Projective Blue Noise Rank 5 Penalty",
+        "out/BN_ProgProjRank_5Penalty",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 5, false);
+        GoodCandidateSubspaceAlgorithmAccell_Rank<2, c_progProjAccelSize, true>(rng, points, c_sampleCount, 5, false);
         }
     );
 
     DoTest(
-        "Progressive Projective Blue Noise 25",
-        "out/BN_ProgProj_25",
+        ""Progressive Projective Blue Noise Rank 25",
+        "out/BN_ProgProjRank_25",
         [](std::mt19937& rng, std::vector<Vec2>& points)
         {
-            GoodCandidateSubspaceAlgorithmAccell<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 25, false);
+        GoodCandidateSubspaceAlgorithmAccell_Rank<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 25, false);
         }
     );
 #endif
@@ -290,6 +302,11 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+* try min of subspace scores.  Not all subspace scores should be equal, but it's worth a test
+ * it's not any good.  you can see the lines but no blue noise (not missing low frequencies). maybe try with weighted scores?
+
+* try weighted subspace scores, weighted by subspace sphere packing like in papaer
 
 ? maybe the problem is that ranking isn't good enough cause you can do great in many subspaces but bomb it on one, and the results will take that, over things that did slightly ok?
  * maybe compare vs the extra penalty.  actually that wouldn't have changed things.
@@ -343,6 +360,8 @@ Get this into sample zoo!
 
 
 Notes:
+* Taking minimum of sum of rank isn't good enough. There are times when a point does great on 2 tests, but does much worse on a third (super super close to an existing point) but is accepted. 
+ * we would prefer something that does "ok" on all tests, over one that is great on mosts tests and bad on the remaining
 ? were you going to co-author with brandon so it could be the wolfe-mann algorithm? :P
 * we are doing periodograms like in the subr16 paper linked below. currently not using squared mag though!
 
