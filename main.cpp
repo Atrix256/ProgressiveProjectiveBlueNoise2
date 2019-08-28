@@ -303,10 +303,12 @@ int main(int argc, char** argv)
 
 TODO:
 
+* try weighted subspace scores, weighted by subspace sphere packing like in paper
+ * might try seeing how raising distance to a power changes things (squared right now!)
+ * could like... take harmonic mean of weighted scores or something too.
+
 * try min of subspace scores.  Not all subspace scores should be equal, but it's worth a test
  * it's not any good.  you can see the lines but no blue noise (not missing low frequencies). maybe try with weighted scores?
-
-* try weighted subspace scores, weighted by subspace sphere packing like in papaer
 
 ? maybe the problem is that ranking isn't good enough cause you can do great in many subspaces but bomb it on one, and the results will take that, over things that did slightly ok?
  * maybe compare vs the extra penalty.  actually that wouldn't have changed things.
