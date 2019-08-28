@@ -240,9 +240,9 @@ void GoodCandidateSubspaceAlgorithmAccell(std::mt19937& rng, std::vector< std::a
                 scores.begin(),
                 scores.end(),
                 [](const CandidateScore& A, const CandidateScore& B)
-            {
-                return A.score > B.score;
-            }
+                {
+                    return A.score > B.score;
+                }
             );
 
             // add the rank of this score a score for each candidate
@@ -255,9 +255,9 @@ void GoodCandidateSubspaceAlgorithmAccell(std::mt19937& rng, std::vector< std::a
             overallScores.begin(),
             overallScores.end(),
             [](const CandidateScore& A, const CandidateScore& B)
-        {
-            return A.score < B.score;
-        }
+            {
+                return A.score < B.score;
+            }
         );
 
         // keep the point that had the lowest summed rank

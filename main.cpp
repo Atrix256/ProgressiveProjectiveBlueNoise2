@@ -9,8 +9,8 @@ static const size_t c_numProjections = 8;  // for 1d projection DFTs.  pi radian
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
 
-#define DO_AVERAGE_TEST() true
-#define DO_SLOW_TESTS() true
+#define DO_AVERAGE_TEST() false
+#define DO_SLOW_TESTS() false
 #define RANDOMIZE_SEEDS() false
 
 
@@ -290,6 +290,10 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+? maybe the problem is that ranking isn't good enough cause you can do great in many subspaces but bomb it on one, and the results will take that, over things that did slightly ok?
+ * maybe compare vs the extra penalty.  actually that wouldn't have changed things.
+ * i think you need to sum the distance, but weigh the subspaces differently. maybe by sphere packing amount.
 
 * projective blue noise thing doesn't seem to be working. the projections don't look good at all.
  * probably need to try averaging 100 tests? dunno... a single test should show something shouldn't it?
