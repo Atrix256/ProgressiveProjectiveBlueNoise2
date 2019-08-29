@@ -337,6 +337,10 @@ int main(int argc, char** argv)
 
 TODO:
 
+* could try normalizing distances 0 to 1, subtracting that from 1 and summing that. It's like rank but not so digital.
+* could try making the rank better. try multiplying ranks by a constant like 2?
+* could try summing a harmonic mean of distances
+
 * try weighted subspace scores, weighted by subspace sphere packing like in paper
  * might try seeing how raising distance to a power changes things (squared right now!)
  * could like... take harmonic mean of weighted scores or something too.
