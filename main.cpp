@@ -211,8 +211,42 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     #endif
 }
 
+void DoExpectedDistanceTest()
+{
+    std::mt19937 rng = GetRNG(0);
+
+    float distance1DAvg = 0.0f;
+    float distance2DAvg = 0.0f;
+
+    for (size_t i = 0; i < 10000000; ++i)
+    {
+        static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+        float ax = dist(rng);
+        float ay = dist(rng);
+        float bx = dist(rng);
+        float by = dist(rng);
+
+        float dx = abs(bx - ax);
+        float dy = abs(by - ay);
+
+        float distance1D = dx;
+        float distance2D = sqrt(dx*dx + dy * dy);
+
+        distance1DAvg = Lerp(distance1DAvg, distance1D, 1.0f / float(i + 1));
+        distance2DAvg = Lerp(distance2DAvg, distance2D, 1.0f / float(i + 1));
+    }
+    printf("1d = %f\n2d = %f\n", distance1DAvg, distance2DAvg);
+}
+
 int main(int argc, char** argv)
 {
+    /*
+    DoExpectedDistanceTest();
+    system("pause");
+    return 0;
+    */
+
     DoTest(
         "Progressive Projective Blue Noise Min",
         "out/BN_ProgProjMin",

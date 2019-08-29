@@ -4,6 +4,20 @@
 
 #include "BN_accel.h"
 
+#if 1
+// these gotten by average distance of random points in N dimensions
+static const float c_weight1d = 0.355226f;
+static const float c_weight2d = 0.505991f;
+#elif 0
+// these gotten from the projective blue noise paper. unsure if i'm doing it right though
+static const float c_weight1d = 1.0f / 2.0f;
+static const float c_weight2d = sqrt(1.0f / 2.0f * sqrt(3.0f));
+#else
+// these gotten by line and circle packing
+static const float c_weight1d = 1.0f;
+static const float c_weight2d = 0.909f;
+#endif
+
 template <size_t DIMENSION, size_t PARTITIONS, bool EXTRAPENALTY>
 void GoodCandidateSubspaceAlgorithmAccell_Min(std::mt19937& rng, std::vector< std::array<float, DIMENSION>>& results, size_t desiredItemCount, int candidateMultiplier, bool reportProgress)
 {
@@ -51,7 +65,7 @@ void GoodCandidateSubspaceAlgorithmAccell_Min(std::mt19937& rng, std::vector< st
         for (int candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex)
         {
             overallScores[candidateIndex].index = candidateIndex;
-            overallScores[candidateIndex].score = FLT_MAX;
+            overallScores[candidateIndex].score = 0.0f;
         }
 
         // score the candidates by each measure of scoring
@@ -59,13 +73,20 @@ void GoodCandidateSubspaceAlgorithmAccell_Min(std::mt19937& rng, std::vector< st
         {
             // get the subspace we are working with
             auto& subspace = subspaces[scoreIndex];
+            float weight = (scoreIndex == 0) ? c_weight2d : c_weight1d;
 
             // for each candidate in this score index...
             for (size_t candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex)
             {
+                float distSq = subspace.SquaredDistanceToClosestPoint(candidates[candidateIndex]);
+                float dist = sqrt(distSq);
+                float score = dist / weight;
+
                 // calculate the score of the candidate.
                 // the score is the minimum distance to any other points
-                overallScores[candidateIndex].score = std::min(overallScores[candidateIndex].score, subspace.SquaredDistanceToClosestPoint(candidates[candidateIndex]));
+
+                // TODO: max gives blue noise but no projective nature. min gives projective nature but no blue noise. what gives?
+                overallScores[candidateIndex].score = (scoreIndex == 0) ? score : std::min(overallScores[candidateIndex].score, score);
             }
         }
 
