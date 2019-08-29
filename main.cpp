@@ -256,6 +256,15 @@ int main(int argc, char** argv)
         }
     );
 
+    DoTest(
+        "Progressive Projective Blue Noise Min 5",
+        "out/BN_ProgProjMin_5",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell_Min<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 5, false);
+        }
+    );
+
     return 0;
 
     DoTest(
@@ -336,6 +345,8 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+* min isn't really min. rename.
 
 * could try normalizing distances 0 to 1, subtracting that from 1 and summing that. It's like rank but not so digital.
 * could try making the rank better. try multiplying ranks by a constant like 2?

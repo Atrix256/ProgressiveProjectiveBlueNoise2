@@ -152,6 +152,11 @@ struct GoodCandidateSubspace
         return minDist;
     }
 
+    float DistanceToClosestPoint(const T& point)
+    {
+        return sqrt(SquaredDistanceToClosestPoint(point));
+    }
+
     void Insert(const T& point)
     {
         int subspacePartition = PartitionForPoint(point);

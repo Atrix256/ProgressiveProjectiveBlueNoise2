@@ -68,35 +68,44 @@ void GoodCandidateSubspaceAlgorithmAccell_Min(std::mt19937& rng, std::vector< st
             overallScores[candidateIndex].score = 0.0f;
         }
 
+        // allocate space for the individual scores
+        CandidateScores scores;
+        scores.resize(candidateCount);
+
         // score the candidates by each measure of scoring
         for (size_t scoreIndex = 0; scoreIndex < c_numScores; ++scoreIndex)
         {
             // get the subspace we are working with
             auto& subspace = subspaces[scoreIndex];
-            float weight = (scoreIndex == 0) ? c_weight2d : c_weight1d;
 
             // for each candidate in this score index...
+            float maxScore = 0.0f;
             for (size_t candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex)
             {
-                float distSq = subspace.SquaredDistanceToClosestPoint(candidates[candidateIndex]);
-                float dist = sqrt(distSq);
-                float score = dist / weight;
-
                 // calculate the score of the candidate.
                 // the score is the minimum distance to any other points
+                scores[candidateIndex].index = candidateIndex;
+                scores[candidateIndex].score = subspace.DistanceToClosestPoint(candidates[candidateIndex]);
 
-                // TODO: max gives blue noise but no projective nature. min gives projective nature but no blue noise. what gives?
-                overallScores[candidateIndex].score = (scoreIndex == 0) ? score : std::min(overallScores[candidateIndex].score, score);
+                maxScore = std::max(maxScore, scores[candidateIndex].score);
+            }
+
+            // normalize scores and take 1 - that.
+            // add that into the overall score
+            for (size_t candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex)
+            {
+                scores[candidateIndex].score = 1.0f - scores[candidateIndex].score / maxScore;
+                overallScores[scores[candidateIndex].index].score += scores[candidateIndex].score;
             }
         }
 
-        // sort the overall scores from high to low
+        // sort the overall scores from low to high
         std::sort(
             overallScores.begin(),
             overallScores.end(),
             [](const CandidateScore& A, const CandidateScore& B)
             {
-                return A.score > B.score;
+                return A.score < B.score;
             }
         );
 
