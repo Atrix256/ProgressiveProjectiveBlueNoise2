@@ -3,6 +3,8 @@
 #include "simple_fft/fft_settings.h"
 #include "simple_fft/fft.h"
 
+#include "math.h"
+
 #include <algorithm>
 #include <vector>
 
@@ -51,12 +53,6 @@ struct ComplexImage1D
         return pixels[x];
     }
 };
-
-template <typename T>
-T Lerp(T A, T B, float t)
-{
-    return T(float(A) * (1.0f - t) + float(B) * t);
-}
 
 void RadiallyAveragePowerSpectrum(const std::vector<float>& imageSrc, size_t imageWidth, std::vector<float>& output, size_t outputCount)
 {

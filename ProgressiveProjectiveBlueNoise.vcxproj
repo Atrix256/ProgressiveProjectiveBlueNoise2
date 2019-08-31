@@ -122,6 +122,8 @@
     <ClInclude Include="BN_progprojMin.h" />
     <ClInclude Include="BN_progprojRank.h" />
     <ClInclude Include="dft.h" />
+    <ClInclude Include="image.h" />
+    <ClInclude Include="math.h" />
     <ClInclude Include="rng.h" />
     <ClInclude Include="scoped_timer.h" />
     <ClInclude Include="simple_fft\check_fft.hpp" />

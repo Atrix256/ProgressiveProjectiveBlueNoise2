@@ -34,6 +34,8 @@
     <ClInclude Include="rng.h" />
     <ClInclude Include="BN_progprojRank.h" />
     <ClInclude Include="BN_progprojMin.h" />
+    <ClInclude Include="image.h" />
+    <ClInclude Include="math.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="stb">

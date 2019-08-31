@@ -19,19 +19,18 @@ static const size_t c_progProjAccelSize = 10;
 #include <thread>
 #include <atomic>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
-
 #include "BN_Mitchels.h"
 #include "BN_progprojRank.h"
 #include "BN_progprojMin.h"
 #include "rng.h"
 #include "dft.h"
 #include "scoped_timer.h"
+#include "image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
 
 #define NUM_TESTS() (DO_AVERAGE_TEST() ? c_numTestsForAveraging : 1)
-
-static const float c_pi = 3.14159265359f;
 
 typedef std::array<float, 2> Vec2;
 
@@ -47,17 +46,6 @@ std::vector<float> MakeSampleImage(const std::vector<Vec2>& points, size_t image
         ret[y*imageResolution + x] = 1.0f;
     }
 
-    return ret;
-}
-
-std::vector<uint8_t> ImageFloatToU8(const std::vector<float>& image, size_t imageResolution)
-{
-    std::vector<uint8_t> ret(imageResolution*imageResolution);
-    for (size_t index = 0, count = image.size(); index < count; ++index)
-    {
-        float valueFloat = powf(image[index], 1.0f / 2.2f);
-        ret[index] = uint8_t(valueFloat * 255.0f + 0.5f);
-    }
     return ret;
 }
 
@@ -113,7 +101,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     size_t numThreads = std::thread::hardware_concurrency();
     std::vector<std::thread> threads(numThreads);
     std::vector<std::vector<float>> radialAverageds(NUM_TESTS());
-    std::vector<std::vector<uint8_t>> imageDFTU8s(NUM_TESTS());
+    std::vector<ImageGrey> imageDFTU8s(NUM_TESTS());
     std::vector<std::array<std::vector<float>, c_numProjections>> projectionDFTs(NUM_TESTS());
 
     std::atomic<size_t> nextIndex(0);
@@ -139,11 +127,12 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     std::vector<float> imageDFT;
                     std::vector<float>& radialAveraged = radialAverageds[testIndex];
                     DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
-                    std::vector<uint8_t> imageU8 = ImageFloatToU8(image, c_imageSize);
+                    ImageGrey imageU8;
+                    FloatToImageGrey(image, c_imageSize, c_imageSize, imageU8);
 
                     // convert the DFT to a U8 image
-                    std::vector<uint8_t>& imageDFTU8 = imageDFTU8s[testIndex];
-                    imageDFTU8 = ImageFloatToU8(imageDFT, c_imageSize);
+                    ImageGrey& imageDFTU8 = imageDFTU8s[testIndex];
+                    FloatToImageGrey(imageDFT, c_imageSize, c_imageSize, imageDFTU8);
 
                     // do projection DFTs
                     std::array<std::vector<float>, c_numProjections>& DFTs = projectionDFTs[testIndex];
@@ -167,9 +156,9 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     if (testIndex == 0)
                     {
                         sprintf(fileName, "%s_one.png", baseFileName);
-                        stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageU8.data(), 0);
+                        SaveImage(fileName, imageU8);
                         sprintf(fileName, "%s_DFT_one.png", baseFileName);
-                        stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8.data(), 0);
+                        SaveImage(fileName, imageDFTU8);
                         sprintf(fileName, "%s_one.csv", baseFileName);
                         SaveCSV(fileName, radialAveraged);
                         sprintf(fileName, "%s_projections_one.csv", baseFileName);
@@ -189,12 +178,12 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
     // combine the work of all the threads
     std::vector<float> radialAveraged_avg;
-    std::vector<uint8_t> imageDFTU8_avg;
+    ImageGrey imageDFTU8_avg(imageDFTU8s[0].m_width, imageDFTU8s[0].m_height);
     std::array<std::vector<float>, c_numProjections> DFTs_avg;
     for (size_t index = 0; index < radialAverageds.size(); ++index)
     {
         IncrementalAverage(radialAverageds[index], radialAveraged_avg, index);
-        IncrementalAverage(imageDFTU8s[index], imageDFTU8_avg, index);
+        IncrementalAverage(imageDFTU8s[index].m_pixels, imageDFTU8_avg.m_pixels, index);
         for (size_t projIndex = 0; projIndex < c_numProjections; ++projIndex)
             IncrementalAverage(projectionDFTs[index][projIndex], DFTs_avg[projIndex], index);
     }
@@ -203,7 +192,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     #if DO_AVERAGE_TEST()
         char fileName[1024];
         sprintf(fileName, "%s_DFT_avg.png", baseFileName);
-        stbi_write_png(fileName, int(c_imageSize), int(c_imageSize), 1, imageDFTU8_avg.data(), 0);
+        SaveImage(fileName, imageDFTU8_avg);
         sprintf(fileName, "%s_avg.csv", baseFileName);
         SaveCSV(fileName, radialAveraged_avg);
         sprintf(fileName, "%s_projections_avg.csv", baseFileName);
@@ -345,6 +334,10 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+Make 1d fourier transform images instead of csvs. Append them with circle shpwing the projection line
+
+* maybe try dividing 2d distance by sqrt(2)?
 
 * min isn't really min. rename.
 
