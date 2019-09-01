@@ -222,6 +222,30 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 ImageGrey blah(c_imageSize, 64, 255);
                                 DrawLine(blah, 0, 0, c_imageSize, 0, 128);
 
+                                std::array<float, c_imageSize> values;
+                                std::array<size_t, c_imageSize> valueCount = {};
+
+                                std::vector<float> projectedValuesDFT;
+                                DFT1D(projectedValues, projectedValuesDFT);
+
+                                float maxValue = 0.0f;
+                                for (size_t index = 0; index < projectedValuesDFT.size(); ++index)
+                                {
+                                    size_t bucket = index / 4;
+                                    valueCount[bucket]++;
+                                    values[bucket] = Lerp(values[bucket], projectedValuesDFT[index], 1.0f / float(valueCount[bucket]));
+                                    maxValue = std::max(maxValue, values[bucket]);
+                                }
+
+                                for (size_t index = 0; index < c_imageSize; ++index)
+                                {
+                                    float f = values[index] / maxValue;
+                                    float pixel = f * 64.0f;
+                                    DrawPoint(blah, int(index), int(pixel), 0);
+                                }
+
+                                // TODO: put a mark at 0 hz
+
                                 ImageGrey blah2;
                                 AppendImageVertical(blah2, imageDFTU8, blah);
                                 imageDFTU8 = blah2;
@@ -308,22 +332,6 @@ void DoExpectedDistanceTest()
 
 int main(int argc, char** argv)
 {
-    DoTest(
-        "White Noise",
-        "out/White",
-        [](std::mt19937& rng, std::vector<Vec2>& points)
-        {
-            points.resize(c_sampleCount);
-            static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-            for (Vec2& v : points)
-            {
-                v[0] = dist(rng);
-                v[1] = dist(rng);
-            }
-        }
-    );
-
-    return 0;
 
     /*
     DoExpectedDistanceTest();
@@ -341,17 +349,6 @@ int main(int argc, char** argv)
     );
 
     DoTest(
-        "Progressive Projective Blue Noise Min 5",
-        "out/BN_ProgProjMin_5",
-        [](std::mt19937& rng, std::vector<Vec2>& points)
-        {
-            GoodCandidateSubspaceAlgorithmAccell_Min<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 5, false);
-        }
-    );
-
-    return 0;
-
-    DoTest(
         "Progressive Projective Blue Noise Rank",
         "out/BN_ProgProjRank",
         [](std::mt19937& rng, std::vector<Vec2>& points)
@@ -361,6 +358,15 @@ int main(int argc, char** argv)
     );
 
 #if DO_SLOW_TESTS()
+    DoTest(
+        "Progressive Projective Blue Noise Min 5",
+        "out/BN_ProgProjMin_5",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            GoodCandidateSubspaceAlgorithmAccell_Min<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 5, false);
+        }
+    );
+
     DoTest(
         ""Progressive Projective Blue Noise Rank Penalty",
         "out/BN_ProgProjRank_Penalty",
@@ -407,8 +413,6 @@ int main(int argc, char** argv)
         }
     );
 
-    // TODO: temporarily moving this up
-    /*
     DoTest(
         "White Noise",
         "out/White",
@@ -423,7 +427,6 @@ int main(int argc, char** argv)
             }
         }
     );
-    */
 
     system("pause");
     return 0;
