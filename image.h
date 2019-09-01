@@ -103,6 +103,10 @@ inline float SmoothStep(float value, float min, float max)
 
 inline void DrawPoint(ImageGrey& image, int x, int y, uint8 C)
 {
+    x = std::max(x, 0);
+    x = std::min(x, image.m_width-1);
+    y = std::max(y, 0);
+    y = std::min(y, image.m_height-1);
     image.m_pixels[y * image.m_width + x] = C;
 }
 

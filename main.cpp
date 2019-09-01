@@ -145,11 +145,23 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         float px = cos(angle);
                         float py = sin(angle);
                         projectedValues[projectionIndex].resize(points.size());
+                        float minValue = FLT_MAX;
+                        float maxValue = -FLT_MAX;
                         for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
                         {
                             projectedValues[projectionIndex][pointIndex] =
                                 points[pointIndex][0] * px +
                                 points[pointIndex][1] * py;
+
+                            minValue = std::min(minValue, projectedValues[projectionIndex][pointIndex]);
+                            maxValue = std::max(maxValue, projectedValues[projectionIndex][pointIndex]);
+                        }
+
+                        // put projected values between 0 and 1
+                        for (float &f : projectedValues[projectionIndex])
+                        {
+                            f = f - minValue;
+                            f = f / (maxValue - minValue);
                         }
 
                         DFT1D(projectedValues[projectionIndex], DFTs[projectionIndex]);
@@ -162,28 +174,23 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                         {
                             const std::vector<float> & projectedValues = projections[testIndex][projectionIndex];
-                            float minValue = FLT_MAX;
-                            float maxValue = -FLT_MAX;
-                            for (float f : projectedValues)
-                            {
-                                minValue = std::min(minValue, f);
-                                maxValue = std::max(maxValue, f);
-                            }
 
                             // make image domain images (left side)
                             {
-                                ImageGrey blah(c_imageSize, 64, 192);
-                                DrawAAB(blah, 0, 32, c_imageSize - 1, 56, 255);
-                                DrawCircle(blah, 10, 10, 8, 0);
+                                ImageGrey blah(c_imageSize, 64, 255);
+                                DrawCircle(blah, 22, 42, 20, 192);
 
                                 float angle = c_pi * float(projectionIndex) / float(c_numProjections);
                                 float px = cos(angle);
                                 float py = sin(angle);
-                                int x1 = int(10.0f - px * 8.0f);
-                                int x2 = int(10.0f + px * 8.0f);
-                                int y1 = int(10.0f - py * 8.0f);
-                                int y2 = int(10.0f + py * 8.0f);
-                                DrawLine(blah, x1, y1, x2, y2, 128);
+                                int x1 = int(22.0f - px * 20.0f);
+                                int x2 = int(22.0f + px * 20.0f);
+                                int y1 = int(42.0f - py * 20.0f);
+                                int y2 = int(42.0f + py * 20.0f);
+                                DrawLine(blah, x1, y1, x2, y2, 255);
+
+                                DrawLine(blah, 0, 0, c_imageSize, 0, 128);
+                                DrawLine(blah, c_imageSize, 0, c_imageSize, 64, 128);
 
                                 std::array<float, c_imageSize> histogram;
                                 std::fill(histogram.begin(), histogram.end(), 0.0f);
@@ -191,10 +198,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                                 for (float f : projectedValues)
                                 {
-                                    // put projected values between 0 and 1
-                                    f = f - minValue;
-                                    f = f / (maxValue - minValue);
-
                                     size_t pos = std::min(size_t(f * float(c_imageSize)), c_imageSize - 1);
                                     histogram[pos] += 1.0f;
                                     maxCount = std::max(maxCount, histogram[pos]);
@@ -205,7 +208,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                                 for (size_t index = 0; index < c_imageSize; ++index)
                                 {
-                                    float pixel = 32.0f + histogram[index] * 24.0f;
+                                    float pixel = histogram[index] * 64.0f;
                                     DrawPoint(blah, int(index), int(pixel), 0);
                                 }
 
@@ -216,18 +219,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                             // make frequency domain images (right side)
                             {
-                                ImageGrey blah(c_imageSize, 64, 192);
-                                DrawAAB(blah, 0, 32, c_imageSize - 1, 56, 255);
-                                DrawCircle(blah, 10, 10, 8, 0);
-
-                                float angle = c_pi * float(projectionIndex) / float(c_numProjections);
-                                float px = cos(angle);
-                                float py = sin(angle);
-                                int x1 = int(10.0f - px * 8.0f);
-                                int x2 = int(10.0f + px * 8.0f);
-                                int y1 = int(10.0f - py * 8.0f);
-                                int y2 = int(10.0f + py * 8.0f);
-                                DrawLine(blah, x1, y1, x2, y2, 128);
+                                ImageGrey blah(c_imageSize, 64, 255);
+                                DrawLine(blah, 0, 0, c_imageSize, 0, 128);
 
                                 ImageGrey blah2;
                                 AppendImageVertical(blah2, imageDFTU8, blah);
