@@ -243,6 +243,36 @@ inline void AppendImageVertical(ImageGrey& result, const ImageGrey& top, const I
 }
 
 // -------------------------------------------------------------------------------
+inline void AppendImageHorizontal(ImageGrey& result, const ImageGrey& left, const ImageGrey& right)
+{
+    int width = left.m_width + right.m_width;
+    int height = std::max(left.m_height, right.m_height);
+    result = ImageGrey(width, height);
+
+    // left image
+    {
+        const uint8* srcRow = left.m_pixels.data();
+        for (int y = 0; y < left.m_height; ++y)
+        {
+            uint8* destRow = &result.m_pixels[y*width];
+            memcpy(destRow, srcRow, left.m_width);
+            srcRow += left.m_width;
+        }
+    }
+
+    // bottom image
+    {
+        const uint8* srcRow = right.m_pixels.data();
+        for (int y = 0; y < right.m_height; ++y)
+        {
+            uint8* destRow = &result.m_pixels[y * width + left.m_width];
+            memcpy(destRow, srcRow, right.m_width);
+            srcRow += right.m_width;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------
 
 inline void DrawCircle(Image& image, int cx, int cy, int radius, uint8 R, uint8 G, uint8 B)
 {

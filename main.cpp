@@ -162,61 +162,93 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                         {
                             const std::vector<float> & projectedValues = projections[testIndex][projectionIndex];
-
-                            ImageGrey blah(c_imageSize, 64, 192);
-                            DrawAAB(blah, 0, 32, c_imageSize - 1, 56, 255);
-                            DrawCircle(blah, 10, 10, 8, 0);
-
-                            // TODO: are projected values ever < 0 or > 1? i think so... so probably need to normalize
-
-                            float angle = c_pi * float(projectionIndex) / float(c_numProjections);
-                            float px = cos(angle);
-                            float py = sin(angle);
-                            int x1 = int(10.0f - px * 8.0f);
-                            int x2 = int(10.0f + px * 8.0f);
-                            int y1 = int(10.0f - py * 8.0f);
-                            int y2 = int(10.0f + py * 8.0f);
-                            DrawLine(blah, x1, y1, x2, y2, 128);
-
-                            float projx = 1.0f;
-                            float projy = 0.0f;
-
-                            std::array<float, c_imageSize> histogram;
-                            std::fill(histogram.begin(), histogram.end(), 0.0f);
-                            float maxCount = 0.0f;
-
-                            for (const float f : projectedValues)
+                            float minValue = FLT_MAX;
+                            float maxValue = -FLT_MAX;
+                            for (float f : projectedValues)
                             {
-                                size_t pos = std::min(size_t(f * float(c_imageSize)), c_imageSize - 1);
-                                histogram[pos] += 1.0f;
-                                maxCount = std::max(maxCount, histogram[pos]);
+                                minValue = std::min(minValue, f);
+                                maxValue = std::max(maxValue, f);
                             }
 
-                            for (float& f : histogram)
-                                f /= maxCount;
-
-                            for (size_t index = 0; index < c_imageSize; ++index)
+                            // make image domain images (left side)
                             {
-                                float pixel = 32.0f + histogram[index] * 24.0f;
-                                DrawPoint(blah, int(index), int(pixel), 0);
+                                ImageGrey blah(c_imageSize, 64, 192);
+                                DrawAAB(blah, 0, 32, c_imageSize - 1, 56, 255);
+                                DrawCircle(blah, 10, 10, 8, 0);
+
+                                float angle = c_pi * float(projectionIndex) / float(c_numProjections);
+                                float px = cos(angle);
+                                float py = sin(angle);
+                                int x1 = int(10.0f - px * 8.0f);
+                                int x2 = int(10.0f + px * 8.0f);
+                                int y1 = int(10.0f - py * 8.0f);
+                                int y2 = int(10.0f + py * 8.0f);
+                                DrawLine(blah, x1, y1, x2, y2, 128);
+
+                                std::array<float, c_imageSize> histogram;
+                                std::fill(histogram.begin(), histogram.end(), 0.0f);
+                                float maxCount = 0.0f;
+
+                                for (float f : projectedValues)
+                                {
+                                    // put projected values between 0 and 1
+                                    f = f - minValue;
+                                    f = f / (maxValue - minValue);
+
+                                    size_t pos = std::min(size_t(f * float(c_imageSize)), c_imageSize - 1);
+                                    histogram[pos] += 1.0f;
+                                    maxCount = std::max(maxCount, histogram[pos]);
+                                }
+
+                                for (float& f : histogram)
+                                    f /= maxCount;
+
+                                for (size_t index = 0; index < c_imageSize; ++index)
+                                {
+                                    float pixel = 32.0f + histogram[index] * 24.0f;
+                                    DrawPoint(blah, int(index), int(pixel), 0);
+                                }
+
+                                ImageGrey blah2;
+                                AppendImageVertical(blah2, imageU8, blah);
+                                imageU8 = blah2;
                             }
 
-                            ImageGrey blah2;
-                            AppendImageVertical(blah2, imageU8, blah);
-                            imageU8 = blah2;
+                            // make frequency domain images (right side)
+                            {
+                                ImageGrey blah(c_imageSize, 64, 192);
+                                DrawAAB(blah, 0, 32, c_imageSize - 1, 56, 255);
+                                DrawCircle(blah, 10, 10, 8, 0);
+
+                                float angle = c_pi * float(projectionIndex) / float(c_numProjections);
+                                float px = cos(angle);
+                                float py = sin(angle);
+                                int x1 = int(10.0f - px * 8.0f);
+                                int x2 = int(10.0f + px * 8.0f);
+                                int y1 = int(10.0f - py * 8.0f);
+                                int y2 = int(10.0f + py * 8.0f);
+                                DrawLine(blah, x1, y1, x2, y2, 128);
+
+                                ImageGrey blah2;
+                                AppendImageVertical(blah2, imageDFTU8, blah);
+                                imageDFTU8 = blah2;
+                            }
                         }
 
+                        ImageGrey blah3;
+                        AppendImageHorizontal(blah3, imageU8, imageDFTU8);
                         sprintf(fileName, "%s_one.png", baseFileName);
-                        SaveImage(fileName, imageU8);
-                        sprintf(fileName, "%s_DFT_one.png", baseFileName);
-                        SaveImage(fileName, imageDFTU8);
+                        SaveImage(fileName, blah3);
+
+                        // TODO: put radial averaged into the image too i think?
                         sprintf(fileName, "%s_one.csv", baseFileName);
                         SaveCSV(fileName, radialAveraged);
-                        sprintf(fileName, "%s_projections_one.csv", baseFileName);
-                        SaveCSV(fileName, DFTs);
                         sprintf(fileName, "%s.txt", baseFileName);
                         SaveCSV(fileName, points);
                     }
+
+                    // TODO: put some black lines seperating tests on x and y axis.
+                    // TODO: maybe draw the projection angle in a different color (lighter) behind the points, only on the left
 
                     // get next test index to do
                     testIndex = nextIndex.fetch_add(1);
@@ -227,6 +259,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     for (std::thread& t : threads)
         t.join();
 
+    /*
     // combine the work of all the threads
     std::vector<float> radialAveraged_avg;
     ImageGrey imageDFTU8_avg(imageDFTU8s[0].m_width, imageDFTU8s[0].m_height);
@@ -238,6 +271,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         for (size_t projIndex = 0; projIndex < c_numProjections; ++projIndex)
             IncrementalAverage(projectionDFTs[index][projIndex], DFTs_avg[projIndex], index);
     }
+    */
 
     // report the averages
     #if DO_AVERAGE_TEST()
