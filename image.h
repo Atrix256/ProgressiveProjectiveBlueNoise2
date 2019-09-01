@@ -17,12 +17,12 @@ typedef uint8_t uint8;
 
 struct ImageGrey
 {
-    ImageGrey(int width = 0, int height = 0)
+    ImageGrey(int width = 0, int height = 0, uint8 fill = 255)
     {
         m_width = width;
         m_height = height;
         m_pixels.resize(m_width*m_height);
-        std::fill(m_pixels.begin(), m_pixels.end(), 255);
+        std::fill(m_pixels.begin(), m_pixels.end(), fill);
     }
 
     int m_width;
@@ -101,7 +101,25 @@ inline float SmoothStep(float value, float min, float max)
 
 // -------------------------------------------------------------------------------
 
-inline void DrawLine(Image& image, int x1, int y1, int x2, int y2, uint8 R, uint8 G, uint8 B)
+inline void DrawPoint(ImageGrey& image, int x, int y, uint8 C)
+{
+    image.m_pixels[y * image.m_width + x] = C;
+}
+
+inline void DrawAAB(ImageGrey& image, int x1, int y1, int x2, int y2, uint8 C)
+{
+    for (int y = y1; y <= y2; ++y)
+    {
+        uint8* pixel = &image.m_pixels[y * image.m_width + x1];
+        for (int x = x1; x <= x2; ++x)
+        {
+            *pixel = C;
+            pixel++;
+        }
+    }
+}
+
+inline void DrawLine(ImageGrey& image, int x1, int y1, int x2, int y2, uint8 C)
 {
     // pad the AABB of pixels we scan, to account for anti aliasing
     int startX = std::max(std::min(x1, x2) - 4, 0);
@@ -119,7 +137,7 @@ inline void DrawLine(Image& image, int x1, int y1, int x2, int y2, uint8 R, uint
     // scan the AABB of our line segment, drawing pixels for the line, as is appropriate
     for (int iy = startY; iy <= endY; ++iy)
     {
-        uint8* pixel = &image.m_pixels[(iy * image.m_width + startX) * 4];
+        uint8* pixel = &image.m_pixels[(iy * image.m_width + startX)];
         for (int ix = startX; ix <= endX; ++ix)
         {
             // project this current pixel onto the line segment to get the closest point on the line segment to the point
@@ -141,12 +159,10 @@ inline void DrawLine(Image& image, int x1, int y1, int x2, int y2, uint8 R, uint
 
             if (alpha > 0.0f)
             {
-                pixel[0] = Lerp(pixel[0], R, alpha);
-                pixel[1] = Lerp(pixel[1], G, alpha);
-                pixel[2] = Lerp(pixel[2], B, alpha);
+                pixel[0] = Lerp(pixel[0], C, alpha);
             }
 
-            pixel += 4;
+            pixel ++;
         }
     }
 }
@@ -197,6 +213,36 @@ inline void AppendImageVertical(Image& result, const Image& top, const Image& bo
 }
 
 // -------------------------------------------------------------------------------
+inline void AppendImageVertical(ImageGrey& result, const ImageGrey& top, const ImageGrey& bottom)
+{
+    int width = std::max(top.m_width, bottom.m_width);
+    int height = top.m_height + bottom.m_height;
+    result = ImageGrey(width, height);
+
+    // top image
+    {
+        const uint8* srcRow = top.m_pixels.data();
+        for (int y = 0; y < top.m_height; ++y)
+        {
+            uint8* destRow = &result.m_pixels[y*width];
+            memcpy(destRow, srcRow, top.m_width);
+            srcRow += top.m_width;
+        }
+    }
+
+    // bottom image
+    {
+        const uint8* srcRow = bottom.m_pixels.data();
+        for (int y = 0; y < bottom.m_height; ++y)
+        {
+            uint8* destRow = &result.m_pixels[(y + top.m_height)*width];
+            memcpy(destRow, srcRow, bottom.m_width);
+            srcRow += bottom.m_width;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------
 
 inline void DrawCircle(Image& image, int cx, int cy, int radius, uint8 R, uint8 G, uint8 B)
 {
@@ -225,6 +271,37 @@ inline void DrawCircle(Image& image, int cx, int cy, int radius, uint8 R, uint8 
             }
 
             pixel += 4;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------
+
+inline void DrawCircle(ImageGrey& image, int cx, int cy, int radius, uint8 C)
+{
+    int startX = std::max(cx - radius - 4, 0);
+    int startY = std::max(cy - radius - 4, 0);
+    int endX = std::min(cx + radius + 4, image.m_width - 1);
+    int endY = std::min(cy + radius + 4, image.m_height - 1);
+
+    for (int iy = startY; iy <= endY; ++iy)
+    {
+        float dy = float(cy - iy);
+        uint8* pixel = &image.m_pixels[(iy * image.m_width + startX)];
+        for (int ix = startX; ix <= endX; ++ix)
+        {
+            float dx = float(cx - ix);
+
+            float distance = std::max(std::sqrtf(dx * dx + dy * dy) - float(radius), 0.0f);
+
+            float alpha = SmoothStep(distance, 2.0f, 0.0f);
+
+            if (alpha > 0.0f)
+            {
+                pixel[0] = Lerp(pixel[0], C, alpha);
+            }
+
+            pixel ++;
         }
     }
 }

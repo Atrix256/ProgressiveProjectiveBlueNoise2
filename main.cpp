@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+// TODO: 1024!
 static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purposes.
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
@@ -41,8 +42,8 @@ std::vector<float> MakeSampleImage(const std::vector<Vec2>& points, size_t image
 
     for (const Vec2& point : points)
     {
-        size_t x = size_t(point[0] * float(imageResolution));
-        size_t y = size_t(point[1] * float(imageResolution));
+        size_t x = std::min(size_t(point[0] * float(imageResolution)), imageResolution - 1);
+        size_t y = std::min(size_t(point[1] * float(imageResolution)), imageResolution - 1);
         ret[y*imageResolution + x] = 1.0f;
     }
 
@@ -103,12 +104,13 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     std::vector<std::vector<float>> radialAverageds(NUM_TESTS());
     std::vector<ImageGrey> imageDFTU8s(NUM_TESTS());
     std::vector<std::array<std::vector<float>, c_numProjections>> projectionDFTs(NUM_TESTS());
+    std::vector<std::array<std::vector<float>, c_numProjections>> projections(NUM_TESTS());
 
     std::atomic<size_t> nextIndex(0);
     for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
         threads[threadIndex] = std::thread(
-            [threadIndex, baseFileName, &radialAverageds, &imageDFTU8s, &projectionDFTs, &nextIndex, &lambda]()
+            [threadIndex, baseFileName, &radialAverageds, &imageDFTU8s, &projectionDFTs, &projections, &nextIndex, &lambda]()
             {
                 char fileName[1024];
 
@@ -135,26 +137,75 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     FloatToImageGrey(imageDFT, c_imageSize, c_imageSize, imageDFTU8);
 
                     // do projection DFTs
+                    std::array<std::vector<float>, c_numProjections>& projectedValues = projections[testIndex];
                     std::array<std::vector<float>, c_numProjections>& DFTs = projectionDFTs[testIndex];
-                    for (size_t dftIndex = 0; dftIndex < c_numProjections; ++dftIndex)
+                    for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                     {
-                        std::vector<float> projectedValues(points.size());
-                        float angle = c_pi * float(dftIndex) / float(c_numProjections);
+                        float angle = c_pi * float(projectionIndex) / float(c_numProjections);
                         float px = cos(angle);
                         float py = sin(angle);
+                        projectedValues[projectionIndex].resize(points.size());
                         for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
                         {
-                            projectedValues[pointIndex] =
+                            projectedValues[projectionIndex][pointIndex] =
                                 points[pointIndex][0] * px +
                                 points[pointIndex][1] * py;
                         }
 
-                        DFT1D(projectedValues, DFTs[dftIndex]);
+                        DFT1D(projectedValues[projectionIndex], DFTs[projectionIndex]);
                     }
 
                     // if this is the first test, write out the "one" images
                     if (testIndex == 0)
                     {
+                        // TODO: move this code into a function, rename things, clean up, when working
+                        for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
+                        {
+                            const std::vector<float> & projectedValues = projections[testIndex][projectionIndex];
+
+                            ImageGrey blah(c_imageSize, 64, 192);
+                            DrawAAB(blah, 0, 32, c_imageSize - 1, 56, 255);
+                            DrawCircle(blah, 10, 10, 8, 0);
+
+                            // TODO: are projected values ever < 0 or > 1? i think so... so probably need to normalize
+
+                            float angle = c_pi * float(projectionIndex) / float(c_numProjections);
+                            float px = cos(angle);
+                            float py = sin(angle);
+                            int x1 = int(10.0f - px * 8.0f);
+                            int x2 = int(10.0f + px * 8.0f);
+                            int y1 = int(10.0f - py * 8.0f);
+                            int y2 = int(10.0f + py * 8.0f);
+                            DrawLine(blah, x1, y1, x2, y2, 128);
+
+                            float projx = 1.0f;
+                            float projy = 0.0f;
+
+                            std::array<float, c_imageSize> histogram;
+                            std::fill(histogram.begin(), histogram.end(), 0.0f);
+                            float maxCount = 0.0f;
+
+                            for (const float f : projectedValues)
+                            {
+                                size_t pos = std::min(size_t(f * float(c_imageSize)), c_imageSize - 1);
+                                histogram[pos] += 1.0f;
+                                maxCount = std::max(maxCount, histogram[pos]);
+                            }
+
+                            for (float& f : histogram)
+                                f /= maxCount;
+
+                            for (size_t index = 0; index < c_imageSize; ++index)
+                            {
+                                float pixel = 32.0f + histogram[index] * 24.0f;
+                                DrawPoint(blah, int(index), int(pixel), 0);
+                            }
+
+                            ImageGrey blah2;
+                            AppendImageVertical(blah2, imageU8, blah);
+                            imageU8 = blah2;
+                        }
+
                         sprintf(fileName, "%s_one.png", baseFileName);
                         SaveImage(fileName, imageU8);
                         sprintf(fileName, "%s_DFT_one.png", baseFileName);
@@ -230,6 +281,23 @@ void DoExpectedDistanceTest()
 
 int main(int argc, char** argv)
 {
+    DoTest(
+        "White Noise",
+        "out/White",
+        [](std::mt19937& rng, std::vector<Vec2>& points)
+        {
+            points.resize(c_sampleCount);
+            static std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+            for (Vec2& v : points)
+            {
+                v[0] = dist(rng);
+                v[1] = dist(rng);
+            }
+        }
+    );
+
+    return 0;
+
     /*
     DoExpectedDistanceTest();
     system("pause");
@@ -312,6 +380,8 @@ int main(int argc, char** argv)
         }
     );
 
+    // TODO: temporarily moving this up
+    /*
     DoTest(
         "White Noise",
         "out/White",
@@ -326,6 +396,7 @@ int main(int argc, char** argv)
             }
         }
     );
+    */
 
     system("pause");
     return 0;
@@ -334,6 +405,13 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+* make a single image per test... left top = points. left below that = projections of points.  right top = dft. right below that = dft of projections
+
+* put projections of points on the point image too. maybe same way the fourier transform goes... the same projections, and put em in images below
+
+* get rid of imagefloat and image.
+ * then rename imagegrey to image?
 
 Make 1d fourier transform images instead of csvs. Append them with circle shpwing the projection line
 
