@@ -1,7 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 // TODO: 1024 samplecount
-static const size_t c_sampleCount = 256; // Must be a power of 2, for DFT purposes.
+static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purposes.
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
 static const size_t c_numTestsForAveraging = 100;
@@ -226,8 +226,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 std::array<float, c_imageSize> values;
                                 std::array<size_t, c_imageSize> valueCount = {};
 
-                                std::vector<float> projectedValuesDFT;
-                                DFT1D(projectedValues, projectedValuesDFT);
+                                std::vector<float> projectedValuesDFT = projectionDFTs[testIndex][projectionIndex];
 
                                 float maxValue = 0.0f;
                                 for (size_t index = 0; index < projectedValuesDFT.size(); ++index)
@@ -241,7 +240,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 for (size_t index = 0; index < c_imageSize; ++index)
                                 {
                                     float f = values[index] / maxValue;
-                                    float pixel = f * 64.0f;
+                                    float pixel = 64.0f - f * 64.0f;
                                     DrawPoint(blah, int(index), int(pixel), 0);
                                 }
 
@@ -267,7 +266,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         sprintf(fileName, "%s_one.png", baseFileName);
                         SaveImage(fileName, blah3);
 
-                        // TODO: put radial averaged into the image too i think?
+                        // TODO: put radial averaged into the image too i think? or make another image.
                         sprintf(fileName, "%s_one.csv", baseFileName);
                         SaveCSV(fileName, radialAveraged);
                         sprintf(fileName, "%s.txt", baseFileName);
