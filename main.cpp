@@ -1,11 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 // TODO: 1024 samplecount
-static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purposes.
+static const size_t c_sampleCount = 4; // Must be a power of 2, for DFT purposes.
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
 static const size_t c_numTestsForAveraging = 100;
-static const size_t c_numProjections = 8;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N
+static const size_t c_numProjections = 64;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N
 
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
@@ -213,6 +213,13 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 ImageGrey blah2;
                                 AppendImageVertical(blah2, imageU8, blah);
                                 imageU8 = blah2;
+
+                                // TODO: temp!
+                                {
+                                    // TODO: maybe write out rotated image too? to see that it's working. would need to squish image though.
+                                    sprintf(fileName, "%s_%zu.png", baseFileName, projectionIndex);
+                                    SaveImage(fileName, blah);
+                                }
 
                                 // append a separator
                                 AppendImageVertical(blah2, imageU8, separatorH);
@@ -440,6 +447,8 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+* a problem with rotated images is that the corners have less area & points. i wonder how this is handled in the eric heitz paper.
 
 * instead of adding seperator lines in the images, add single pixel width / height images that do that. this means no overlap
 
