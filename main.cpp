@@ -33,8 +33,6 @@ static const size_t c_progProjAccelSize = 10;
 
 #define NUM_TESTS() (DO_AVERAGE_TEST() ? c_numTestsForAveraging : 1)
 
-typedef std::array<float, 2> Vec2;
-
 std::vector<float> MakeSampleImage(const std::vector<Vec2>& points, size_t imageResolution)
 {
     std::vector<float> ret;
@@ -142,26 +140,22 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                     {
                         float angle = c_pi * float(projectionIndex) / float(c_numProjections);
-                        float px = cos(angle);
-                        float py = sin(angle);
+                        Vec2 projectionAxis = Vec2{ cos(angle), sin(angle) };
                         projectedValues[projectionIndex].resize(points.size());
-                        float minValue = FLT_MAX;
-                        float maxValue = -FLT_MAX;
                         for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
                         {
-                            projectedValues[projectionIndex][pointIndex] =
-                                points[pointIndex][0] * px +
-                                points[pointIndex][1] * py;
+                            // points[pointIndex] is in [0,1].
+                            // make point be in [-1, 1]
+                            Vec2 point = points[pointIndex] * 2.0f - 1.0f;
 
-                            minValue = std::min(minValue, projectedValues[projectionIndex][pointIndex]);
-                            maxValue = std::max(maxValue, projectedValues[projectionIndex][pointIndex]);
-                        }
+                            // do the projection
+                            projectedValues[projectionIndex][pointIndex] = dot(point, projectionAxis);
 
-                        // put projected values between 0 and 1
-                        for (float &f : projectedValues[projectionIndex])
-                        {
-                            f = f - minValue;
-                            f = f / (maxValue - minValue);
+                            // bring the projected value back into [-1, 1] by scaling
+                            // TODO: do this!
+
+                            // put the projected value into [0,1]
+                            projectedValues[projectionIndex][pointIndex] = projectedValues[projectionIndex][pointIndex] * 0.5f + 0.5f;
                         }
 
                         DFT1D(projectedValues[projectionIndex], DFTs[projectionIndex]);
@@ -170,6 +164,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     // if this is the first test, write out the "one" images
                     if (testIndex == 0)
                     {
+                        ImageGrey separatorH(c_imageSize, 1, 128);
+
                         // TODO: move this code into a function, rename things, clean up, when working
                         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                         {
@@ -189,9 +185,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 int y2 = int(42.0f + py * 20.0f);
                                 DrawLine(blah, x1, y1, x2, y2, 255);
 
-                                DrawLine(blah, 0, 0, c_imageSize, 0, 128);
-                                DrawLine(blah, c_imageSize, 0, c_imageSize, 64, 128);
-
                                 std::array<float, c_imageSize> histogram;
                                 std::fill(histogram.begin(), histogram.end(), 0.0f);
                                 float maxCount = 0.0f;
@@ -208,19 +201,26 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                                 for (size_t index = 0; index < c_imageSize; ++index)
                                 {
-                                    float pixel = histogram[index] * 64.0f;
+                                    if (histogram[index] == 0.0f)
+                                        continue;
+
+                                    float pixel = 64.0f - (2.0f + histogram[index] * 60.0f);
                                     DrawPoint(blah, int(index), int(pixel), 0);
                                 }
 
+                                // append the image
                                 ImageGrey blah2;
                                 AppendImageVertical(blah2, imageU8, blah);
+                                imageU8 = blah2;
+
+                                // append a separator
+                                AppendImageVertical(blah2, imageU8, separatorH);
                                 imageU8 = blah2;
                             }
 
                             // make frequency domain images (right side)
                             {
                                 ImageGrey blah(c_imageSize, 64, 255);
-                                DrawLine(blah, 0, 0, c_imageSize, 0, 128);
 
                                 std::array<float, c_imageSize> values;
                                 std::array<size_t, c_imageSize> valueCount = {};
@@ -231,7 +231,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 float maxValue = 0.0f;
                                 for (size_t index = 0; index < projectedValuesDFT.size(); ++index)
                                 {
-                                    size_t bucket = index / 4;
+                                    size_t bucket = index * c_imageSize / projectedValuesDFT.size();
                                     valueCount[bucket]++;
                                     values[bucket] = Lerp(values[bucket], projectedValuesDFT[index], 1.0f / float(valueCount[bucket]));
                                     maxValue = std::max(maxValue, values[bucket]);
@@ -246,13 +246,22 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                                 // TODO: put a mark at 0 hz
 
+                                // append the image
                                 ImageGrey blah2;
                                 AppendImageVertical(blah2, imageDFTU8, blah);
+                                imageDFTU8 = blah2;
+
+                                // append a separator
+                                AppendImageVertical(blah2, imageDFTU8, separatorH);
                                 imageDFTU8 = blah2;
                             }
                         }
 
+                        ImageGrey seperatorV(1, imageU8.m_height, 128);
                         ImageGrey blah3;
+                        AppendImageHorizontal(blah3, imageU8, seperatorV);
+                        imageU8 = blah3;
+
                         AppendImageHorizontal(blah3, imageU8, imageDFTU8);
                         sprintf(fileName, "%s_one.png", baseFileName);
                         SaveImage(fileName, blah3);
@@ -263,9 +272,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         sprintf(fileName, "%s.txt", baseFileName);
                         SaveCSV(fileName, points);
                     }
-
-                    // TODO: put some black lines seperating tests on x and y axis.
-                    // TODO: maybe draw the projection angle in a different color (lighter) behind the points, only on the left
 
                     // get next test index to do
                     testIndex = nextIndex.fetch_add(1);
@@ -436,12 +442,25 @@ int main(int argc, char** argv)
 
 TODO:
 
+* instead of adding seperator lines in the images, add single pixel width / height images that do that. this means no overlap
+
+* you aren't doing the projection normalization right.
+ * it needs to be shrunk from 0.5 so...
+ * subtract 0.5 to go from [0,1] to [-0.5,+0.5]. then divide by length / 2 i think.  then add 0.5 again.
+
+* mitchels has some things at "half value" for the first projection.  Are they really having overlap?
+
+* the dft projections may not be correct... or are they? need to think about it & look at the data. maybe look with smaller sample counts?
+ * also the regular projections... do they line up? maybe instead of normalizing numerically, should do it analytically, since the first point shouldn't be at zero necesarily etc!
+
 * make a single image per test... left top = points. left below that = projections of points.  right top = dft. right below that = dft of projections
 
 * put projections of points on the point image too. maybe same way the fourier transform goes... the same projections, and put em in images below
 
 * get rid of imagefloat and image.
  * then rename imagegrey to image?
+
+ * something else to try: Random center point and random half space. Take the point that has the best discrepancy score? would also need to make sure not too close to existing points. dunno how.
 
 Make 1d fourier transform images instead of csvs. Append them with circle shpwing the projection line
 
