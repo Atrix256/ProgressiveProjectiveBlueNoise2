@@ -1,7 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-// TODO: 1024!
-static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purposes.
+// TODO: 1024 samplecount
+static const size_t c_sampleCount = 256; // Must be a power of 2, for DFT purposes.
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
 static const size_t c_numTestsForAveraging = 100;
@@ -139,9 +139,10 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     std::array<std::vector<float>, c_numProjections>& DFTs = projectionDFTs[testIndex];
                     for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                     {
+                        projectedValues[projectionIndex].resize(points.size());
                         float angle = c_pi * float(projectionIndex) / float(c_numProjections);
                         Vec2 projectionAxis = Vec2{ cos(angle), sin(angle) };
-                        projectedValues[projectionIndex].resize(points.size());
+                        float length = abs(projectionAxis[0]) + abs(projectionAxis[1]);
                         for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex)
                         {
                             // points[pointIndex] is in [0,1].
@@ -152,7 +153,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                             projectedValues[projectionIndex][pointIndex] = dot(point, projectionAxis);
 
                             // bring the projected value back into [-1, 1] by scaling
-                            // TODO: do this!
+                            projectedValues[projectionIndex][pointIndex] /= length;
 
                             // put the projected value into [0,1]
                             projectedValues[projectionIndex][pointIndex] = projectedValues[projectionIndex][pointIndex] * 0.5f + 0.5f;
@@ -338,7 +339,6 @@ void DoExpectedDistanceTest()
 
 int main(int argc, char** argv)
 {
-
     /*
     DoExpectedDistanceTest();
     system("pause");
