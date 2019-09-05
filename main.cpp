@@ -102,11 +102,13 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     std::vector<std::vector<float>> DFTMagnitudes2d(NUM_TESTS());
     std::vector<std::array<std::vector<float>, c_numProjections>> DFTMagnitudes1d(NUM_TESTS());
 
+    Image imageOut;
+
     std::atomic<size_t> nextIndex(0);
     for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
         threads[threadIndex] = std::thread(
-            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes2d, &DFTMagnitudes1d, &nextIndex, &lambda]()
+            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes2d, &DFTMagnitudes1d, &nextIndex, &lambda, &imageOut]()
             {
                 char fileName[1024];
 
@@ -281,8 +283,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         Image seperatorV(1, imageU8.m_height, 128);
                         AppendImageHorizontal(imageU8, seperatorV);
                         AppendImageHorizontal(imageU8, imageDFTU8);
-                        sprintf(fileName, "%s_one.png", baseFileName);
-                        SaveImage(fileName, imageU8);
+                        imageOut = imageU8;
 
                         // TODO: put radial averaged into the image too i think? or make another image.
                         sprintf(fileName, "%s_one.csv", baseFileName);
@@ -324,8 +325,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
             NormalizeDFT(DFTMagnitudes1d_avg[projectionIndex], DFTMagnitudes1d_avg_normalized[projectionIndex]);
 
-        Image out;
-        FloatToImage(DFTMagnitudes2d_avg_normalized, c_imageSize, c_imageSize, out);
+        Image imageAvg;
+        FloatToImage(DFTMagnitudes2d_avg_normalized, c_imageSize, c_imageSize, imageAvg);
 
         Image separatorH(c_imageSize, 1, 128);
         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
@@ -357,20 +358,22 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
             // TODO: put a mark at 0 hz. it's in the middle
 
             // append the image and the separator
-            AppendImageVertical(out, projectedPointsDFTImage);
-            AppendImageVertical(out, separatorH);
+            AppendImageVertical(imageAvg, projectedPointsDFTImage);
+            AppendImageVertical(imageAvg, separatorH);
         }
 
-        char fileName[1024];
-        sprintf(fileName, "%s_DFT_avg.png", baseFileName);
-        SaveImage(fileName, out);
+        Image seperatorV(1, imageOut.m_height, 128);
+        AppendImageHorizontal(imageOut, seperatorV);
+        AppendImageHorizontal(imageOut, imageAvg);
 
         // TODO: radial averages too
+        // TODO: share rendering code w/ main loop
     }
-
-    // TODO: make a single image per test that has samples, dft, dft avg
-
     #endif
+
+    char fileName[1024];
+    sprintf(fileName, "%s_DFT.png", baseFileName);
+    SaveImage(fileName, imageOut);
 }
 
 void DoExpectedDistanceTest()
