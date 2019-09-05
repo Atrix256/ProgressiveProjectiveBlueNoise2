@@ -12,7 +12,7 @@ static const size_t c_progProjAccelSize = 10;
 #define DO_AVERAGE_TEST() true
 #define DO_SLOW_TESTS() false
 #define RANDOMIZE_SEEDS() false
-#define SHOW_ROTATED_PROJECTIONS() true  // TODO: include in averages i think!
+#define SHOW_ROTATED_PROJECTIONS() false
 
 #include <array>
 #include <vector>
@@ -99,15 +99,14 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     size_t numThreads = std::thread::hardware_concurrency();
     std::vector<std::thread> threads(numThreads);
     std::vector<std::vector<float>> radialAverageds(NUM_TESTS());
-    std::vector<std::vector<float>> DFTMagnitudes(NUM_TESTS());
-    std::vector<std::array<std::vector<float>, c_numProjections>> projectionDFTsAll(NUM_TESTS());
-    std::vector<std::array<std::vector<float>, c_numProjections>> projectionsAll(NUM_TESTS());
+    std::vector<std::vector<float>> DFTMagnitudes2d(NUM_TESTS());
+    std::vector<std::array<std::vector<float>, c_numProjections>> DFTMagnitudes1d(NUM_TESTS());
 
     std::atomic<size_t> nextIndex(0);
     for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
         threads[threadIndex] = std::thread(
-            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes, &projectionDFTsAll, &projectionsAll, &nextIndex, &lambda]()
+            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes2d, &DFTMagnitudes1d, &nextIndex, &lambda]()
             {
                 char fileName[1024];
 
@@ -121,28 +120,25 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                     // make an image of the samples
                     std::vector<float> image = MakeSampleImage(points, c_imageSize);
-
-                    // DFT the image and get the radial average as well
-                    DFTPeriodogram(image, DFTMagnitudes[testIndex], c_imageSize, c_sampleCount);
-
-                    std::vector<float> imageDFT;
-                    NormalizeDFT(DFTMagnitudes[testIndex], imageDFT);
-
-                    std::vector<float>& radialAveraged = radialAverageds[testIndex];
-                    RadiallyAveragePowerSpectrum(imageDFT, c_imageSize, radialAveraged, c_radialAverageBucketCount);
-
-                    // TODO: normalize the raidally averaged power spectrum?
-
                     Image imageU8;
                     FloatToImage(image, c_imageSize, c_imageSize, imageU8);
 
-                    // convert the DFT to a U8 image
+                    // DFT the image
+                    DFTPeriodogram(image, DFTMagnitudes2d[testIndex], c_imageSize, c_sampleCount);
+                    std::vector<float> imageDFT;
+                    NormalizeDFT(DFTMagnitudes2d[testIndex], imageDFT);
                     Image imageDFTU8;
                     FloatToImage(imageDFT, c_imageSize, c_imageSize, imageDFTU8);
 
+                    // get the radial averaged power spectrum
+                    std::vector<float>& radialAveraged = radialAverageds[testIndex];
+                    RadiallyAveragePowerSpectrum(imageDFT, c_imageSize, radialAveraged, c_radialAverageBucketCount);
+
+                    // TODO: normalize the raidally averaged power spectrum? probably! also make an image??
+
                     // do projection DFTs
-                    std::array<std::vector<float>, c_numProjections>& projectedValues = projectionsAll[testIndex];
-                    std::array<std::vector<float>, c_numProjections>& projectionDFTsRaw = projectionDFTsAll[testIndex];
+                    std::array<std::vector<float>, c_numProjections> projectedValues;
+                    std::array<std::vector<float>, c_numProjections>& projectionDFTsRaw = DFTMagnitudes1d[testIndex];
                     std::array<std::vector<float>, c_numProjections> projectionDFTs;
                     for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                     {
@@ -304,33 +300,77 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     for (std::thread& t : threads)
         t.join();
 
-    // TODO: get working!
-    /*
     // report the averages
     #if DO_AVERAGE_TEST()
     {
+        // TODO: get radially averaged data in here too!
+
         // combine the work of all the threads
-        std::vector<float> radialAveraged_avg;
-        Image imageDFTU8_avg(imageDFTU8s[0].m_width, imageDFTU8s[0].m_height);
-        std::array<std::vector<float>, c_numProjections> DFTs_avg;
-        for (size_t index = 0; index < radialAverageds.size(); ++index)
+        std::vector<float> DFTMagnitudes2d_avg = DFTMagnitudes2d[0];
+        std::array<std::vector<float>, c_numProjections> DFTMagnitudes1d_avg = DFTMagnitudes1d[0];
+
+        for (size_t testIndex = 1; testIndex < NUM_TESTS(); ++testIndex)
         {
-            IncrementalAverage(radialAverageds[index], radialAveraged_avg, index);
-            IncrementalAverage(imageDFTU8s[index].m_pixels, imageDFTU8_avg.m_pixels, index);
-            for (size_t projIndex = 0; projIndex < c_numProjections; ++projIndex)
-                IncrementalAverage(projectionDFTs[index][projIndex], DFTs_avg[projIndex], index);
+            IncrementalAverage(DFTMagnitudes2d[testIndex], DFTMagnitudes2d_avg, testIndex);
+
+            for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
+                IncrementalAverage(DFTMagnitudes1d[testIndex][projectionIndex], DFTMagnitudes1d_avg[projectionIndex], testIndex);
+        }
+
+        std::vector<float> DFTMagnitudes2d_avg_normalized;
+        NormalizeDFT(DFTMagnitudes2d_avg, DFTMagnitudes2d_avg_normalized);
+
+        std::array<std::vector<float>, c_numProjections> DFTMagnitudes1d_avg_normalized;
+        for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
+            NormalizeDFT(DFTMagnitudes1d_avg[projectionIndex], DFTMagnitudes1d_avg_normalized[projectionIndex]);
+
+        Image out;
+        FloatToImage(DFTMagnitudes2d_avg_normalized, c_imageSize, c_imageSize, out);
+
+        Image separatorH(c_imageSize, 1, 128);
+        for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
+        {
+            // make frequency domain images (right side)
+            Image projectedPointsDFTImage(c_imageSize, 64, 255);
+
+            std::array<float, c_imageSize> values;
+            std::array<size_t, c_imageSize> valueCount = {};
+            for (size_t index = 0; index < DFTMagnitudes1d_avg_normalized[projectionIndex].size(); ++index)
+            {
+                size_t bucket = index * c_imageSize / DFTMagnitudes1d_avg_normalized[projectionIndex].size();
+                valueCount[bucket]++;
+                values[bucket] = Lerp(values[bucket], DFTMagnitudes1d_avg_normalized[projectionIndex][index], 1.0f / float(valueCount[bucket]));
+            }
+
+            // get the maximum value
+            float maxValue = 0.0f;
+            for (float f : values)
+                maxValue = std::max(maxValue, f);
+
+            for (size_t index = 0; index < c_imageSize; ++index)
+            {
+                float f = values[index] / maxValue;
+                float pixel = 64.0f - f * 64.0f;
+                DrawPoint(projectedPointsDFTImage, int(index), int(pixel), 0);
+            }
+
+            // TODO: put a mark at 0 hz. it's in the middle
+
+            // append the image and the separator
+            AppendImageVertical(out, projectedPointsDFTImage);
+            AppendImageVertical(out, separatorH);
         }
 
         char fileName[1024];
         sprintf(fileName, "%s_DFT_avg.png", baseFileName);
-        SaveImage(fileName, imageDFTU8_avg);
-        sprintf(fileName, "%s_avg.csv", baseFileName);
-        SaveCSV(fileName, radialAveraged_avg);
-        sprintf(fileName, "%s_projections_avg.csv", baseFileName);
-        SaveCSV(fileName, DFTs_avg);
+        SaveImage(fileName, out);
+
+        // TODO: radial averages too
     }
+
+    // TODO: make a single image per test that has samples, dft, dft avg
+
     #endif
-    */
 }
 
 void DoExpectedDistanceTest()
@@ -377,9 +417,6 @@ int main(int argc, char** argv)
             GoodCandidateSubspaceAlgorithmAccell_Min<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 1, false);
         }
     );
-
-    // TODO: temp!
-    return 0;
 
     DoTest(
         "Progressive Projective Blue Noise Rank",
