@@ -165,6 +165,18 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     RadiallyAveragePowerSpectrum(imageDFT, c_imageSize, radialAveraged, c_radialAverageBucketCount);
 
                     // TODO: normalize the raidally averaged power spectrum? probably! also make an image??
+                    // TODO: put this somewhere else?
+                    // TODO: get the averaged image too for averaged tests!
+                    // TODO: append to imageOutRadial instead of saving here
+                    if (testIndex == 0)
+                    {
+                        Image blah(c_imageSize, 64, 255);
+                        std::vector<float> radialAveragedNormalized;
+                        NormalizeDFT(radialAveraged, radialAveragedNormalized);
+                        DrawDFT1D(radialAveragedNormalized, blah);
+                        sprintf(fileName, "%s_radial.png", baseFileName);
+                        SaveImage(fileName, blah);
+                    }
 
                     // do projection DFTs
                     std::array<std::vector<float>, c_numProjections> projectedValues;
