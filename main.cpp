@@ -91,6 +91,33 @@ void IncrementalAverage(const std::vector<T>& src, std::vector<T>& dest, size_t 
         dest[index] = Lerp(dest[index], src[index], 1.0f / float(sampleIndex + 1));
 }
 
+void DrawDFT1D(const std::vector<float>& DFTMagnitudes1d, Image& image)
+{
+    std::array<float, c_imageSize> values;
+    std::array<size_t, c_imageSize> valueCount = {};
+    for (size_t index = 0; index < DFTMagnitudes1d.size(); ++index)
+    {
+        size_t bucket = index * c_imageSize / DFTMagnitudes1d.size();
+        valueCount[bucket]++;
+        values[bucket] = Lerp(values[bucket], DFTMagnitudes1d[index], 1.0f / float(valueCount[bucket]));
+    }
+
+    // get the maximum value
+    float maxValue = 0.0f;
+    for (float f : values)
+        maxValue = std::max(maxValue, f);
+
+    for (size_t index = 0; index < c_imageSize; ++index)
+    {
+        float f = values[index] / maxValue;
+        float pixel = 64.0f - f * 64.0f;
+        DrawPoint(image, int(index), int(pixel), 0);
+    }
+
+    // TODO: put a mark at 0 hz. it's in the middle
+    // TODO: draw lines between bucket values, instead of points?
+}
+
 template <typename LAMBDA>
 void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 {
@@ -103,12 +130,13 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     std::vector<std::array<std::vector<float>, c_numProjections>> DFTMagnitudes1d(NUM_TESTS());
 
     Image imageOut;
+    Image imageOutRadial;
 
     std::atomic<size_t> nextIndex(0);
     for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
         threads[threadIndex] = std::thread(
-            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes2d, &DFTMagnitudes1d, &nextIndex, &lambda, &imageOut]()
+            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes2d, &DFTMagnitudes1d, &nextIndex, &lambda, &imageOut, &imageOutRadial]()
             {
                 char fileName[1024];
 
@@ -241,42 +269,17 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                             // make frequency domain images (right side)
                             {
                                 Image projectedPointsDFTImage(c_imageSize, 64, 255);
-
-                                std::array<float, c_imageSize> values;
-                                std::array<size_t, c_imageSize> valueCount = {};
-                                for (size_t index = 0; index < projectionDFTs[projectionIndex].size(); ++index)
-                                {
-                                    size_t bucket = index * c_imageSize / projectionDFTs[projectionIndex].size();
-                                    valueCount[bucket]++;
-                                    values[bucket] = Lerp(values[bucket], projectionDFTs[projectionIndex][index], 1.0f / float(valueCount[bucket]));
-                                }
-
-                                // get the maximum value
-                                float maxValue = 0.0f;
-                                for (float f : values)
-                                    maxValue = std::max(maxValue, f);
-
-                                for (size_t index = 0; index < c_imageSize; ++index)
-                                {
-                                    float f = values[index] / maxValue;
-                                    float pixel = 64.0f - f * 64.0f;
-                                    DrawPoint(projectedPointsDFTImage, int(index), int(pixel), 0);
-                                }
+                                DrawDFT1D(projectionDFTs[projectionIndex], projectedPointsDFTImage);
+                                AppendImageVertical(imageDFTU8, projectedPointsDFTImage);
+                                AppendImageVertical(imageDFTU8, separatorH);
 
                                 #if SHOW_ROTATED_PROJECTIONS()
                                 {
                                     AppendImageVertical(imageRotatedU8, projectedPointsDFTImage);
-
                                     sprintf(fileName, "%s_%zu.png", baseFileName, projectionIndex);
                                     SaveImage(fileName, imageRotatedU8);
                                 }
                                 #endif
-
-                                // TODO: put a mark at 0 hz. it's in the middle
-
-                                // append the image and the separator
-                                AppendImageVertical(imageDFTU8, projectedPointsDFTImage);
-                                AppendImageVertical(imageDFTU8, separatorH);
                             }
                         }
 
@@ -331,43 +334,19 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         Image separatorH(c_imageSize, 1, 128);
         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
         {
-            // make frequency domain images (right side)
+            // make frequency domain images (right side), append the image and a separator
             Image projectedPointsDFTImage(c_imageSize, 64, 255);
-
-            std::array<float, c_imageSize> values;
-            std::array<size_t, c_imageSize> valueCount = {};
-            for (size_t index = 0; index < DFTMagnitudes1d_avg_normalized[projectionIndex].size(); ++index)
-            {
-                size_t bucket = index * c_imageSize / DFTMagnitudes1d_avg_normalized[projectionIndex].size();
-                valueCount[bucket]++;
-                values[bucket] = Lerp(values[bucket], DFTMagnitudes1d_avg_normalized[projectionIndex][index], 1.0f / float(valueCount[bucket]));
-            }
-
-            // get the maximum value
-            float maxValue = 0.0f;
-            for (float f : values)
-                maxValue = std::max(maxValue, f);
-
-            for (size_t index = 0; index < c_imageSize; ++index)
-            {
-                float f = values[index] / maxValue;
-                float pixel = 64.0f - f * 64.0f;
-                DrawPoint(projectedPointsDFTImage, int(index), int(pixel), 0);
-            }
-
-            // TODO: put a mark at 0 hz. it's in the middle
-
-            // append the image and the separator
+            DrawDFT1D(DFTMagnitudes1d_avg_normalized[projectionIndex], projectedPointsDFTImage);
             AppendImageVertical(imageAvg, projectedPointsDFTImage);
             AppendImageVertical(imageAvg, separatorH);
         }
 
+        // add this and a separator to the right side of the final image
         Image seperatorV(1, imageOut.m_height, 128);
         AppendImageHorizontal(imageOut, seperatorV);
         AppendImageHorizontal(imageOut, imageAvg);
 
         // TODO: radial averages too
-        // TODO: share rendering code w/ main loop
     }
     #endif
 
@@ -509,30 +488,18 @@ int main(int argc, char** argv)
 
 TODO:
 
-* append horizontal the average image to the main image?
+* get radial avg images working instead of writing out a csv
+
+* If less than resolution buckets, draw line between buckets instead of dots? Maybe always draw lines
+
+* maybe you shouldn't shrink the length in projected DFTs? or maybe you should shrink the projected points by sqrt2 always, like you do for the radial averaged thing
+ * probably ok but i dunno, think about it
 
 * a problem with rotated images is that the corners have less area & points. i wonder how this is handled in the eric heitz paper.
 
-* instead of adding seperator lines in the images, add single pixel width / height images that do that. this means no overlap
+* something else to try: Random center point and random half space. Take the point that has the best discrepancy score? would also need to make sure not too close to existing points. dunno how.
 
-* you aren't doing the projection normalization right.
- * it needs to be shrunk from 0.5 so...
- * subtract 0.5 to go from [0,1] to [-0.5,+0.5]. then divide by length / 2 i think.  then add 0.5 again.
-
-* mitchels has some things at "half value" for the first projection.  Are they really having overlap?
-
-* the dft projections may not be correct... or are they? need to think about it & look at the data. maybe look with smaller sample counts?
- * also the regular projections... do they line up? maybe instead of normalizing numerically, should do it analytically, since the first point shouldn't be at zero necesarily etc!
-
-* make a single image per test... left top = points. left below that = projections of points.  right top = dft. right below that = dft of projections
-
-* put projections of points on the point image too. maybe same way the fourier transform goes... the same projections, and put em in images below
-
- * something else to try: Random center point and random half space. Take the point that has the best discrepancy score? would also need to make sure not too close to existing points. dunno how.
-
-Make 1d fourier transform images instead of csvs. Append them with circle shpwing the projection line
-
-* maybe try dividing 2d distance by sqrt(2)?
+* maybe try dividing 2d distance by sqrt(2)? to make scores from 1d equal to 2d.
 
 * min isn't really min. rename.
 
