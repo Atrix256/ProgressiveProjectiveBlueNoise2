@@ -96,7 +96,25 @@ void RadiallyAveragePowerSpectrum(const std::vector<float>& imageSrc, size_t ima
         f /= maxValue;
 }
 
-void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imageDest, size_t width, size_t numSamples_, std::vector<float>& radialAverage, size_t radialAverageCount)
+void NormalizeDFT(const std::vector<float>& imageSrc, std::vector<float>& imageDest)
+{
+    float maxMag = 0.0f;
+    for (float f : imageSrc)
+        maxMag = std::max(f, maxMag);
+
+    // normalize the magnitudes
+    //const float c = 1.0f / log(1.0f + maxMag);
+    {
+        imageDest.resize(imageSrc.size());
+        for (size_t index = 0; index < imageSrc.size(); ++index)
+        {
+            //float normalized = c * log(1.0f + *src);
+            imageDest[index] = imageSrc[index] / maxMag;
+        }
+    }
+}
+
+void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& magnitudes, size_t width, size_t numSamples_)
 {
     // convert the source image to complex so it can be DFTd
     ComplexImage2D complexImageIn(width, width);
@@ -108,10 +126,8 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
     ComplexImage2D complexImageOut(width, width);
     simple_fft::FFT(complexImageIn, complexImageOut, width, width, error);
 
-    // get the magnitudes and max magnitude
+    // get the magnitudes
     float numSamples = float(numSamples_);
-    std::vector<float> magnitudes;
-    float maxMag = 0.0f;
     {
         magnitudes.resize(width * width, 0.0f);
         float* dest = magnitudes.data();
@@ -124,37 +140,14 @@ void DFTPeriodogram(const std::vector<float>& imageSrc, std::vector<float>& imag
 
                 const complex_type& c = complexImageOut(srcX, srcY);
                 float mag = float(sqrt(c.real()*c.real() + c.imag()*c.imag())) / numSamples;
-                maxMag = std::max(mag, maxMag);
                 *dest = mag;
-                ++dest;
-            }
-        }
-    }
-
-    // make the radially averaged power spectrum
-    RadiallyAveragePowerSpectrum(magnitudes, width, radialAverage, radialAverageCount);
-
-    // normalize the magnitudes
-    //const float c = 1.0f / log(1.0f + maxMag);
-    {
-        imageDest.resize(width * width);
-        const float* src = magnitudes.data();
-        float* dest = imageDest.data();
-        for (size_t y = 0; y < width; ++y)
-        {
-            for (size_t x = 0; x < width; ++x)
-            {
-                //float normalized = c * log(1.0f + *src);
-                *dest = *src / maxMag;
-
-                ++src;
                 ++dest;
             }
         }
     }
 }
 
-void DFT1D(const std::vector<float>& imageSrc, std::vector<float>& imageDest)
+void DFT1D(const std::vector<float>& imageSrc, std::vector<float>& magnitudes)
 {
     // convert the source image to float and store it as complex so it can be DFTd
     size_t width = imageSrc.size();
@@ -167,12 +160,7 @@ void DFT1D(const std::vector<float>& imageSrc, std::vector<float>& imageDest)
     ComplexImage1D complexImageOut(width);
     simple_fft::FFT(complexImageIn, complexImageOut, width, error);
 
-    // Zero out DC, we don't really care about it, and the value is huge.
-    complexImageOut(0) = 0.0f;
-
-    // get the magnitudes and max magnitude
-    std::vector<float> magnitudes;
-    float maxMag = 0.0f;
+    // get the magnitudes
     {
         magnitudes.resize(width, 0.0f);
         float* dest = magnitudes.data();
@@ -182,25 +170,7 @@ void DFT1D(const std::vector<float>& imageSrc, std::vector<float>& imageDest)
 
             const complex_type& c = complexImageOut(srcX);
             float mag = float(sqrt(c.real()*c.real() + c.imag()*c.imag()));
-            maxMag = std::max(mag, maxMag);
             *dest = mag;
-            ++dest;
-        }
-    }
-
-    // normalize the magnitudes and convert it back to a type T image
-    const float c = 1.0f / log(1.0f + maxMag);
-    {
-        imageDest.resize(width);
-        const float* src = magnitudes.data();
-        float* dest = imageDest.data();
-        for (size_t x = 0; x < width; ++x)
-        {
-            //float normalized = c * log(1.0f / 255.0f + *src);
-            float normalized = *src / maxMag;
-            *dest = normalized;
-
-            ++src;
             ++dest;
         }
     }

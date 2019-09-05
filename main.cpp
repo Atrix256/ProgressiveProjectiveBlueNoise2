@@ -12,7 +12,7 @@ static const size_t c_progProjAccelSize = 10;
 #define DO_AVERAGE_TEST() true
 #define DO_SLOW_TESTS() false
 #define RANDOMIZE_SEEDS() false
-#define SHOW_ROTATED_PROJECTIONS() false  // TODO: include in averages i think!
+#define SHOW_ROTATED_PROJECTIONS() true  // TODO: include in averages i think!
 
 #include <array>
 #include <vector>
@@ -99,15 +99,15 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     size_t numThreads = std::thread::hardware_concurrency();
     std::vector<std::thread> threads(numThreads);
     std::vector<std::vector<float>> radialAverageds(NUM_TESTS());
-    std::vector<Image> imageDFTU8s(NUM_TESTS());
-    std::vector<std::array<std::vector<float>, c_numProjections>> projectionDFTs(NUM_TESTS());
-    std::vector<std::array<std::vector<float>, c_numProjections>> projections(NUM_TESTS());
+    std::vector<std::vector<float>> DFTMagnitudes(NUM_TESTS());
+    std::vector<std::array<std::vector<float>, c_numProjections>> projectionDFTsAll(NUM_TESTS());
+    std::vector<std::array<std::vector<float>, c_numProjections>> projectionsAll(NUM_TESTS());
 
     std::atomic<size_t> nextIndex(0);
     for (size_t threadIndex = 0; threadIndex < threads.size(); ++threadIndex)
     {
         threads[threadIndex] = std::thread(
-            [threadIndex, baseFileName, &radialAverageds, &imageDFTU8s, &projectionDFTs, &projections, &nextIndex, &lambda]()
+            [threadIndex, baseFileName, &radialAverageds, &DFTMagnitudes, &projectionDFTsAll, &projectionsAll, &nextIndex, &lambda]()
             {
                 char fileName[1024];
 
@@ -123,19 +123,27 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     std::vector<float> image = MakeSampleImage(points, c_imageSize);
 
                     // DFT the image and get the radial average as well
+                    DFTPeriodogram(image, DFTMagnitudes[testIndex], c_imageSize, c_sampleCount);
+
                     std::vector<float> imageDFT;
+                    NormalizeDFT(DFTMagnitudes[testIndex], imageDFT);
+
                     std::vector<float>& radialAveraged = radialAverageds[testIndex];
-                    DFTPeriodogram(image, imageDFT, c_imageSize, c_sampleCount, radialAveraged, c_radialAverageBucketCount);
+                    RadiallyAveragePowerSpectrum(imageDFT, c_imageSize, radialAveraged, c_radialAverageBucketCount);
+
+                    // TODO: normalize the raidally averaged power spectrum?
+
                     Image imageU8;
                     FloatToImage(image, c_imageSize, c_imageSize, imageU8);
 
                     // convert the DFT to a U8 image
-                    Image& imageDFTU8 = imageDFTU8s[testIndex];
+                    Image imageDFTU8;
                     FloatToImage(imageDFT, c_imageSize, c_imageSize, imageDFTU8);
 
                     // do projection DFTs
-                    std::array<std::vector<float>, c_numProjections>& projectedValues = projections[testIndex];
-                    std::array<std::vector<float>, c_numProjections>& DFTs = projectionDFTs[testIndex];
+                    std::array<std::vector<float>, c_numProjections>& projectedValues = projectionsAll[testIndex];
+                    std::array<std::vector<float>, c_numProjections>& projectionDFTsRaw = projectionDFTsAll[testIndex];
+                    std::array<std::vector<float>, c_numProjections> projectionDFTs;
                     for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                     {
                         projectedValues[projectionIndex].resize(points.size());
@@ -158,7 +166,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                             projectedValues[projectionIndex][pointIndex] = projectedValues[projectionIndex][pointIndex] * 0.5f + 0.5f;
                         }
 
-                        DFT1D(projectedValues[projectionIndex], DFTs[projectionIndex]);
+                        DFT1D(projectedValues[projectionIndex], projectionDFTsRaw[projectionIndex]);
+                        NormalizeDFT(projectionDFTsRaw[projectionIndex], projectionDFTs[projectionIndex]);
                     }
 
                     // if this is the first test, write out the "one" images
@@ -169,8 +178,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         // TODO: move this code into a function, rename things, clean up, when working
                         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                         {
-                            const std::vector<float> & projectedValues = projections[testIndex][projectionIndex];
-
                             #if SHOW_ROTATED_PROJECTIONS()
                                 Image imageRotatedU8;
                             #endif
@@ -195,7 +202,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 std::fill(histogram.begin(), histogram.end(), 0.0f);
                                 float maxCount = 0.0f;
 
-                                for (float f : projectedValues)
+                                for (float f : projectedValues[projectionIndex])
                                 {
                                     size_t pos = std::min(size_t(f * float(c_imageSize)), c_imageSize - 1);
                                     histogram[pos] += 1.0f;
@@ -240,14 +247,12 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 std::array<float, c_imageSize> values;
                                 std::array<size_t, c_imageSize> valueCount = {};
 
-                                std::vector<float> projectedValuesDFT = projectionDFTs[testIndex][projectionIndex];
-
                                 float maxValue = 0.0f;
-                                for (size_t index = 0; index < projectedValuesDFT.size(); ++index)
+                                for (size_t index = 0; index < projectionDFTs[projectionIndex].size(); ++index)
                                 {
-                                    size_t bucket = index * c_imageSize / projectedValuesDFT.size();
+                                    size_t bucket = index * c_imageSize / projectionDFTs[projectionIndex].size();
                                     valueCount[bucket]++;
-                                    values[bucket] = Lerp(values[bucket], projectedValuesDFT[index], 1.0f / float(valueCount[bucket]));
+                                    values[bucket] = Lerp(values[bucket], projectionDFTs[projectionIndex][index], 1.0f / float(valueCount[bucket]));
                                     maxValue = std::max(maxValue, values[bucket]);
                                 }
 
@@ -267,7 +272,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 }
                                 #endif
 
-                                // TODO: put a mark at 0 hz. it should be in the middle, but verify by looking at averages
+                                // TODO: put a mark at 0 hz. it's in the middle
 
                                 // append the image and the separator
                                 AppendImageVertical(imageDFTU8, projectedPointsDFTImage);
@@ -297,6 +302,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     for (std::thread& t : threads)
         t.join();
 
+    // TODO: get working!
+    /*
     // report the averages
     #if DO_AVERAGE_TEST()
     {
@@ -321,6 +328,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         SaveCSV(fileName, DFTs_avg);
     }
     #endif
+    */
 }
 
 void DoExpectedDistanceTest()
@@ -459,7 +467,7 @@ int main(int argc, char** argv)
 
 TODO:
 
-make an option to write out the projected rotated points, and their rotated selves.
+* append horizontal the average image to the main image?
 
 * a problem with rotated images is that the corners have less area & points. i wonder how this is handled in the eric heitz paper.
 
