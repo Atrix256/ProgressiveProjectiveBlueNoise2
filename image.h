@@ -217,11 +217,11 @@ inline void AppendImageVertical(Image& result, const Image& top, const Image& bo
 }
 
 // -------------------------------------------------------------------------------
-inline void AppendImageVertical(ImageGrey& result, const ImageGrey& top, const ImageGrey& bottom)
+inline void AppendImageVertical(ImageGrey& top, const ImageGrey& bottom)
 {
     int width = std::max(top.m_width, bottom.m_width);
     int height = top.m_height + bottom.m_height;
-    result = ImageGrey(width, height);
+    ImageGrey result = ImageGrey(width, height);
 
     // top image
     {
@@ -244,14 +244,16 @@ inline void AppendImageVertical(ImageGrey& result, const ImageGrey& top, const I
             srcRow += bottom.m_width;
         }
     }
+
+    top = result;
 }
 
 // -------------------------------------------------------------------------------
-inline void AppendImageHorizontal(ImageGrey& result, const ImageGrey& left, const ImageGrey& right)
+inline void AppendImageHorizontal(ImageGrey& left, const ImageGrey& right)
 {
     int width = left.m_width + right.m_width;
     int height = std::max(left.m_height, right.m_height);
-    result = ImageGrey(width, height);
+    ImageGrey result = ImageGrey(width, height);
 
     // left image
     {
@@ -274,6 +276,8 @@ inline void AppendImageHorizontal(ImageGrey& result, const ImageGrey& left, cons
             srcRow += right.m_width;
         }
     }
+
+    left = result;
 }
 
 // -------------------------------------------------------------------------------

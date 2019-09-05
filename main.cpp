@@ -1,19 +1,18 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-// TODO: 1024 samplecount
-static const size_t c_sampleCount = 4; // Must be a power of 2, for DFT purposes.
+static const size_t c_sampleCount = 1024; // Must be a power of 2, for DFT purposes.
 static const size_t c_imageSize = 256;
 static const size_t c_radialAverageBucketCount = 64;
 static const size_t c_numTestsForAveraging = 100;
-static const size_t c_numProjections = 64;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N
+static const size_t c_numProjections = 8;  // for 1d projection DFTs.  pi radians times 0/N, 1/N ... (N-1)/N
 
 // Progressive Projective blue noise settings
 static const size_t c_progProjAccelSize = 10;
 
-#define DO_AVERAGE_TEST() false
+#define DO_AVERAGE_TEST() true
 #define DO_SLOW_TESTS() false
 #define RANDOMIZE_SEEDS() false
-
+#define SHOW_ROTATED_PROJECTIONS() false  // TODO: include in averages i think!
 
 #include <array>
 #include <vector>
@@ -150,7 +149,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                             Vec2 point = points[pointIndex] * 2.0f - 1.0f;
 
                             // do the projection
-                            projectedValues[projectionIndex][pointIndex] = dot(point, projectionAxis);
+                            projectedValues[projectionIndex][pointIndex] = Dot(point, projectionAxis);
 
                             // bring the projected value back into [-1, 1] by scaling
                             projectedValues[projectionIndex][pointIndex] /= length;
@@ -172,6 +171,10 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         {
                             const std::vector<float> & projectedValues = projections[testIndex][projectionIndex];
 
+                            #if SHOW_ROTATED_PROJECTIONS()
+                                ImageGrey imageRotatedU8;
+                            #endif
+
                             // make image domain images (left side)
                             {
                                 ImageGrey blah(c_imageSize, 64, 255);
@@ -182,9 +185,11 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 float py = sin(angle);
                                 int x1 = int(22.0f - px * 20.0f);
                                 int x2 = int(22.0f + px * 20.0f);
-                                int y1 = int(42.0f - py * 20.0f);
-                                int y2 = int(42.0f + py * 20.0f);
+                                int y1 = int(42.0f + py * 20.0f);
+                                int y2 = int(42.0f - py * 20.0f);
                                 DrawLine(blah, x1, y1, x2, y2, 255);
+
+                                float projectionLength = abs(px) + abs(py);
 
                                 std::array<float, c_imageSize> histogram;
                                 std::fill(histogram.begin(), histogram.end(), 0.0f);
@@ -209,21 +214,23 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                     DrawPoint(blah, int(index), int(pixel), 0);
                                 }
 
-                                // append the image
-                                ImageGrey blah2;
-                                AppendImageVertical(blah2, imageU8, blah);
-                                imageU8 = blah2;
-
-                                // TODO: temp!
+                                #if SHOW_ROTATED_PROJECTIONS()
                                 {
-                                    // TODO: maybe write out rotated image too? to see that it's working. would need to squish image though.
-                                    sprintf(fileName, "%s_%zu.png", baseFileName, projectionIndex);
-                                    SaveImage(fileName, blah);
-                                }
 
-                                // append a separator
-                                AppendImageVertical(blah2, imageU8, separatorH);
-                                imageU8 = blah2;
+                                    std::vector<Vec2> rotatedPoints = points;
+                                    for (Vec2& v : rotatedPoints)
+                                        v = (Rotate(v - 0.5f, -angle) / projectionLength) + 0.5f;
+                                    std::vector<float> imageRotated = MakeSampleImage(rotatedPoints, c_imageSize);
+                                    FloatToImageGrey(imageRotated, c_imageSize, c_imageSize, imageRotatedU8);
+
+                                    AppendImageVertical(imageRotatedU8, blah);
+                                    AppendImageVertical(imageRotatedU8, separatorH);
+                                }
+                                #endif
+
+                                // append the image and separator
+                                AppendImageVertical(imageU8, blah);
+                                AppendImageVertical(imageU8, separatorH);
                             }
 
                             // make frequency domain images (right side)
@@ -251,27 +258,28 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                     DrawPoint(blah, int(index), int(pixel), 0);
                                 }
 
-                                // TODO: put a mark at 0 hz
+                                #if SHOW_ROTATED_PROJECTIONS()
+                                {
+                                    AppendImageVertical(imageRotatedU8, blah);
 
-                                // append the image
-                                ImageGrey blah2;
-                                AppendImageVertical(blah2, imageDFTU8, blah);
-                                imageDFTU8 = blah2;
+                                    sprintf(fileName, "%s_%zu.png", baseFileName, projectionIndex);
+                                    SaveImage(fileName, imageRotatedU8);
+                                }
+                                #endif
 
-                                // append a separator
-                                AppendImageVertical(blah2, imageDFTU8, separatorH);
-                                imageDFTU8 = blah2;
+                                // TODO: put a mark at 0 hz. it should be in the middle, but verify by looking at averages
+
+                                // append the image and the separator
+                                AppendImageVertical(imageDFTU8, blah);
+                                AppendImageVertical(imageDFTU8, separatorH);
                             }
                         }
 
                         ImageGrey seperatorV(1, imageU8.m_height, 128);
-                        ImageGrey blah3;
-                        AppendImageHorizontal(blah3, imageU8, seperatorV);
-                        imageU8 = blah3;
-
-                        AppendImageHorizontal(blah3, imageU8, imageDFTU8);
+                        AppendImageHorizontal(imageU8, seperatorV);
+                        AppendImageHorizontal(imageU8, imageDFTU8);
                         sprintf(fileName, "%s_one.png", baseFileName);
-                        SaveImage(fileName, blah3);
+                        SaveImage(fileName, imageU8);
 
                         // TODO: put radial averaged into the image too i think? or make another image.
                         sprintf(fileName, "%s_one.csv", baseFileName);
@@ -289,22 +297,21 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     for (std::thread& t : threads)
         t.join();
 
-    /*
-    // combine the work of all the threads
-    std::vector<float> radialAveraged_avg;
-    ImageGrey imageDFTU8_avg(imageDFTU8s[0].m_width, imageDFTU8s[0].m_height);
-    std::array<std::vector<float>, c_numProjections> DFTs_avg;
-    for (size_t index = 0; index < radialAverageds.size(); ++index)
-    {
-        IncrementalAverage(radialAverageds[index], radialAveraged_avg, index);
-        IncrementalAverage(imageDFTU8s[index].m_pixels, imageDFTU8_avg.m_pixels, index);
-        for (size_t projIndex = 0; projIndex < c_numProjections; ++projIndex)
-            IncrementalAverage(projectionDFTs[index][projIndex], DFTs_avg[projIndex], index);
-    }
-    */
-
     // report the averages
     #if DO_AVERAGE_TEST()
+    {
+        // combine the work of all the threads
+        std::vector<float> radialAveraged_avg;
+        ImageGrey imageDFTU8_avg(imageDFTU8s[0].m_width, imageDFTU8s[0].m_height);
+        std::array<std::vector<float>, c_numProjections> DFTs_avg;
+        for (size_t index = 0; index < radialAverageds.size(); ++index)
+        {
+            IncrementalAverage(radialAverageds[index], radialAveraged_avg, index);
+            IncrementalAverage(imageDFTU8s[index].m_pixels, imageDFTU8_avg.m_pixels, index);
+            for (size_t projIndex = 0; projIndex < c_numProjections; ++projIndex)
+                IncrementalAverage(projectionDFTs[index][projIndex], DFTs_avg[projIndex], index);
+        }
+
         char fileName[1024];
         sprintf(fileName, "%s_DFT_avg.png", baseFileName);
         SaveImage(fileName, imageDFTU8_avg);
@@ -312,6 +319,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         SaveCSV(fileName, radialAveraged_avg);
         sprintf(fileName, "%s_projections_avg.csv", baseFileName);
         SaveCSV(fileName, DFTs_avg);
+    }
     #endif
 }
 
@@ -359,6 +367,9 @@ int main(int argc, char** argv)
             GoodCandidateSubspaceAlgorithmAccell_Min<2, c_progProjAccelSize, false>(rng, points, c_sampleCount, 1, false);
         }
     );
+
+    // TODO: temp!
+    return 0;
 
     DoTest(
         "Progressive Projective Blue Noise Rank",
@@ -447,6 +458,8 @@ int main(int argc, char** argv)
 /*
 
 TODO:
+
+make an option to write out the projected rotated points, and their rotated selves.
 
 * a problem with rotated images is that the corners have less area & points. i wonder how this is handled in the eric heitz paper.
 
