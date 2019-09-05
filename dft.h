@@ -160,6 +160,9 @@ void DFT1D(const std::vector<float>& imageSrc, std::vector<float>& magnitudes)
     ComplexImage1D complexImageOut(width);
     simple_fft::FFT(complexImageIn, complexImageOut, width, error);
 
+    // Zero out DC, we don't really care about it, and the value is huge.
+    complexImageOut(0) = 0.0f;
+
     // get the magnitudes
     {
         magnitudes.resize(width, 0.0f);

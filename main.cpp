@@ -246,15 +246,17 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                                 std::array<float, c_imageSize> values;
                                 std::array<size_t, c_imageSize> valueCount = {};
-
-                                float maxValue = 0.0f;
                                 for (size_t index = 0; index < projectionDFTs[projectionIndex].size(); ++index)
                                 {
                                     size_t bucket = index * c_imageSize / projectionDFTs[projectionIndex].size();
                                     valueCount[bucket]++;
                                     values[bucket] = Lerp(values[bucket], projectionDFTs[projectionIndex][index], 1.0f / float(valueCount[bucket]));
-                                    maxValue = std::max(maxValue, values[bucket]);
                                 }
+
+                                // get the maximum value
+                                float maxValue = 0.0f;
+                                for (float f : values)
+                                    maxValue = std::max(maxValue, f);
 
                                 for (size_t index = 0; index < c_imageSize; ++index)
                                 {
