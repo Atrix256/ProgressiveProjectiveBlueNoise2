@@ -123,7 +123,6 @@ void DrawDFT1D(const std::vector<float>& DFTMagnitudes1d, Image& image)
     }
 
     // TODO: put a mark at 0 hz. it's in the middle
-    // TODO: draw lines between bucket values, instead of points?
 }
 
 template <typename LAMBDA>
@@ -172,19 +171,11 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     std::vector<float>& radialAveraged = radialAverageds[testIndex];
                     RadiallyAveragePowerSpectrum(imageDFT, c_imageSize, radialAveraged, c_radialAverageBucketCount);
 
-                    // TODO: radialAveraged is already normalized.
-                    // TODO: normalize the raidally averaged power spectrum? probably! also make an image??
-                    // TODO: put this somewhere else?
-                    // TODO: get the averaged image too for averaged tests!
-                    // TODO: append to imageOutRadial instead of saving here
+                    // radial image
                     if (testIndex == 0)
                     {
-                        Image blah(c_imageSize, 64, 255);
-                        //std::vector<float> radialAveragedNormalized;
-                        //NormalizeDFT(radialAveraged, radialAveragedNormalized);
-                        DrawDFT1D(radialAveraged, blah);
-                        sprintf(fileName, "%s_radial.png", baseFileName);
-                        SaveImage(fileName, blah);
+                        imageOutRadial = Image(c_imageSize, 64, 255);
+                        DrawDFT1D(radialAveraged, imageOutRadial);
                     }
 
                     // do projection DFTs
@@ -222,7 +213,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     {
                         Image separatorH(c_imageSize, 1, 128);
 
-                        // TODO: move this code into a function, rename things, clean up, when working
                         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                         {
                             #if SHOW_ROTATED_PROJECTIONS()
@@ -308,7 +298,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         AppendImageHorizontal(imageU8, imageDFTU8);
                         imageOut = imageU8;
 
-                        // TODO: put radial averaged into the image too i think? or make another image.
                         sprintf(fileName, "%s.txt", baseFileName);
                         SaveCSV(fileName, points);
                     }
@@ -325,15 +314,15 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     // report the averages
     #if DO_AVERAGE_TEST()
     {
-        // TODO: get radially averaged data in here too!
-
         // combine the work of all the threads
         std::vector<float> DFTMagnitudes2d_avg = DFTMagnitudes2d[0];
         std::array<std::vector<float>, c_numProjections> DFTMagnitudes1d_avg = DFTMagnitudes1d[0];
+        std::vector<float> radialAverageds_avg = radialAverageds[0];
 
         for (size_t testIndex = 1; testIndex < NUM_TESTS(); ++testIndex)
         {
             IncrementalAverage(DFTMagnitudes2d[testIndex], DFTMagnitudes2d_avg, testIndex);
+            IncrementalAverage(radialAverageds[testIndex], radialAverageds_avg, testIndex);
 
             for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
                 IncrementalAverage(DFTMagnitudes1d[testIndex][projectionIndex], DFTMagnitudes1d_avg[projectionIndex], testIndex);
@@ -349,10 +338,10 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         Image imageAvg;
         FloatToImage(DFTMagnitudes2d_avg_normalized, c_imageSize, c_imageSize, imageAvg);
 
+        // DFT averages
         Image separatorH(c_imageSize, 1, 128);
         for (size_t projectionIndex = 0; projectionIndex < c_numProjections; ++projectionIndex)
         {
-            // make frequency domain images (right side), append the image and a separator
             Image projectedPointsDFTImage(c_imageSize, 64, 255);
             DrawDFT1D(DFTMagnitudes1d_avg_normalized[projectionIndex], projectedPointsDFTImage);
             AppendImageVertical(imageAvg, separatorH);
@@ -364,13 +353,22 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
         AppendImageHorizontal(imageOut, seperatorV);
         AppendImageHorizontal(imageOut, imageAvg);
 
-        // TODO: radial averages too
+        // radial averages
+        Image imageRadial(c_imageSize, 64, 255);
+        DrawDFT1D(radialAverageds_avg, imageRadial);
+        AppendImageVertical(imageOutRadial, separatorH);
+        AppendImageVertical(imageOutRadial, imageRadial);
     }
     #endif
 
+    // points, projections, projection DFTs
     char fileName[1024];
     sprintf(fileName, "%s.png", baseFileName);
     SaveImage(fileName, imageOut);
+
+    // radial averages
+    sprintf(fileName, "%s_radial.png", baseFileName);
+    SaveImage(fileName, imageOutRadial);
 }
 
 void DoExpectedDistanceTest()
