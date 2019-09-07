@@ -270,7 +270,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
 
                                 #if SHOW_ROTATED_PROJECTIONS()
                                 {
-
                                     std::vector<Vec2> rotatedPoints = points;
                                     for (Vec2& v : rotatedPoints)
                                         v = (Rotate(v - 0.5f, -angle) / projectionLength) + 0.5f;
@@ -283,16 +282,16 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                                 #endif
 
                                 // append the image and separator
-                                AppendImageVertical(imageU8, projectedPointsImage);
                                 AppendImageVertical(imageU8, separatorH);
+                                AppendImageVertical(imageU8, projectedPointsImage);
                             }
 
                             // make frequency domain images (right side)
                             {
                                 Image projectedPointsDFTImage(c_imageSize, 64, 255);
                                 DrawDFT1D(projectionDFTs[projectionIndex], projectedPointsDFTImage);
-                                AppendImageVertical(imageDFTU8, projectedPointsDFTImage);
                                 AppendImageVertical(imageDFTU8, separatorH);
+                                AppendImageVertical(imageDFTU8, projectedPointsDFTImage);
 
                                 #if SHOW_ROTATED_PROJECTIONS()
                                 {
@@ -310,8 +309,6 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                         imageOut = imageU8;
 
                         // TODO: put radial averaged into the image too i think? or make another image.
-                        sprintf(fileName, "%s_one.csv", baseFileName);
-                        SaveCSV(fileName, radialAveraged);
                         sprintf(fileName, "%s.txt", baseFileName);
                         SaveCSV(fileName, points);
                     }
@@ -358,8 +355,8 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
             // make frequency domain images (right side), append the image and a separator
             Image projectedPointsDFTImage(c_imageSize, 64, 255);
             DrawDFT1D(DFTMagnitudes1d_avg_normalized[projectionIndex], projectedPointsDFTImage);
-            AppendImageVertical(imageAvg, projectedPointsDFTImage);
             AppendImageVertical(imageAvg, separatorH);
+            AppendImageVertical(imageAvg, projectedPointsDFTImage);
         }
 
         // add this and a separator to the right side of the final image
@@ -372,7 +369,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
     #endif
 
     char fileName[1024];
-    sprintf(fileName, "%s_DFT.png", baseFileName);
+    sprintf(fileName, "%s.png", baseFileName);
     SaveImage(fileName, imageOut);
 }
 
