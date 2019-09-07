@@ -93,11 +93,14 @@ void IncrementalAverage(const std::vector<T>& src, std::vector<T>& dest, size_t 
 
 void DrawDFT1D(const std::vector<float>& DFTMagnitudes1d, Image& image)
 {
-    std::array<float, c_imageSize> values;
-    std::array<size_t, c_imageSize> valueCount = {};
+    size_t bucketCount = std::min(c_imageSize, DFTMagnitudes1d.size());
+
+    std::vector<float> values(bucketCount);
+    std::vector<size_t> valueCount(bucketCount, 0);
+
     for (size_t index = 0; index < DFTMagnitudes1d.size(); ++index)
     {
-        size_t bucket = index * c_imageSize / DFTMagnitudes1d.size();
+        size_t bucket = index * bucketCount / DFTMagnitudes1d.size();
         valueCount[bucket]++;
         values[bucket] = Lerp(values[bucket], DFTMagnitudes1d[index], 1.0f / float(valueCount[bucket]));
     }
@@ -107,11 +110,16 @@ void DrawDFT1D(const std::vector<float>& DFTMagnitudes1d, Image& image)
     for (float f : values)
         maxValue = std::max(maxValue, f);
 
-    for (size_t index = 0; index < c_imageSize; ++index)
+    int lastX, lastY;
+    for (size_t index = 0; index < bucketCount; ++index)
     {
+        size_t pixelX = index * c_imageSize / bucketCount;
         float f = values[index] / maxValue;
-        float pixel = 64.0f - f * 64.0f;
-        DrawPoint(image, int(index), int(pixel), 0);
+        float pixelY = 64.0f - f * 64.0f;
+        if (index > 0)
+            DrawLine(image, lastX, lastY, int(pixelX), int(pixelY), 0);
+        lastX = int(pixelX);
+        lastY = int(pixelY);
     }
 
     // TODO: put a mark at 0 hz. it's in the middle
@@ -164,6 +172,7 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     std::vector<float>& radialAveraged = radialAverageds[testIndex];
                     RadiallyAveragePowerSpectrum(imageDFT, c_imageSize, radialAveraged, c_radialAverageBucketCount);
 
+                    // TODO: radialAveraged is already normalized.
                     // TODO: normalize the raidally averaged power spectrum? probably! also make an image??
                     // TODO: put this somewhere else?
                     // TODO: get the averaged image too for averaged tests!
@@ -171,9 +180,9 @@ void DoTest(const char* label, const char* baseFileName, const LAMBDA& lambda)
                     if (testIndex == 0)
                     {
                         Image blah(c_imageSize, 64, 255);
-                        std::vector<float> radialAveragedNormalized;
-                        NormalizeDFT(radialAveraged, radialAveragedNormalized);
-                        DrawDFT1D(radialAveragedNormalized, blah);
+                        //std::vector<float> radialAveragedNormalized;
+                        //NormalizeDFT(radialAveraged, radialAveragedNormalized);
+                        DrawDFT1D(radialAveraged, blah);
                         sprintf(fileName, "%s_radial.png", baseFileName);
                         SaveImage(fileName, blah);
                     }
