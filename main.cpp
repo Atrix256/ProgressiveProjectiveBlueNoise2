@@ -504,6 +504,8 @@ TODO:
 
 * the projected points (left most column) look pretty evenly spaced. are you doing that right?
 
+* the spike down in the 1d DFTs is due to zeroing out DC.  If we don't, it's a big spike up. what to do?
+
 * next, get real projective blue noise working to compare against? the projective DFTs are weird
 
 * maybe you shouldn't shrink the length in projected DFTs? or maybe you should shrink the projected points by sqrt2 always, like you do for the radial averaged thing
