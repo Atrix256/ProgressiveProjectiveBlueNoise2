@@ -117,12 +117,10 @@ void DrawDFT1D(const std::vector<float>& DFTMagnitudes1d, Image& image)
         float f = values[index] / maxValue;
         float pixelY = 64.0f - f * 64.0f;
         if (index > 0)
-            DrawLine(image, lastX, lastY, int(pixelX), int(pixelY), 0);
+            DrawLine(image, lastX, lastY, int(pixelX), int(pixelY), 64);
         lastX = int(pixelX);
         lastY = int(pixelY);
     }
-
-    // TODO: put a mark at 0 hz. it's in the middle
 }
 
 template <typename LAMBDA>
@@ -504,9 +502,9 @@ int main(int argc, char** argv)
 
 TODO:
 
-* get radial avg images working instead of writing out a csv
+* the projected points (left most column) look pretty evenly spaced. are you doing that right?
 
-* If less than resolution buckets, draw line between buckets instead of dots? Maybe always draw lines
+* next, get real projective blue noise working to compare against? the projective DFTs are weird
 
 * maybe you shouldn't shrink the length in projected DFTs? or maybe you should shrink the projected points by sqrt2 always, like you do for the radial averaged thing
  * probably ok but i dunno, think about it
